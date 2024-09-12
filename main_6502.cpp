@@ -102,6 +102,23 @@ struct CPU
         Y = 0x00;
 
         memory.Initialise();
+
+
+        std::string filename = "memory.bin";
+        if (memory.LoadFromFile(filename, 0x8000)) // Load file at address 0x8000
+        {
+            std::cout << "Memory loaded successfully from " << filename << std::endl;
+        }
+        else
+        {
+            std::cerr << "Failed to load memory from file." << std::endl;
+        }
+
+        // Do the startup sequence. Now i am just cheating by directly reading where the PC should start
+        Byte lowerStartAddress = memory[0xFFFC];
+        Byte upperStartAddress = memory[0xFFFD];
+        Word startAddress = (upperStartAddress << 8) | lowerStartAddress;
+        PC = startAddress;
     };
 
     Word FetchWord(u32& Cycles, Mem& memory)
@@ -232,15 +249,6 @@ int main()
     // mem[0xFFFE] = CPU::INS_LDA_ZP;
     // mem[0xFFFF] = 0x10;
     // Load binary file into memory
-    std::string filename = "memory.bin";
-    if (mem.LoadFromFile(filename, 0x8000)) // Load file at address 0x8000
-    {
-        std::cout << "Memory loaded successfully from " << filename << std::endl;
-    }
-    else
-    {
-        std::cerr << "Failed to load memory from file." << std::endl;
-    }
 
     cpu.Execute(2, mem);
     cpu.Execute(3, mem);
