@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <iostream>
+#include <fstream>
+#include <vector>
+
 // http://www.obelisk.me.uk/6502/
 // https://www.youtube.com/watch?v=qJgsuQoy9bc
 
@@ -20,6 +24,36 @@ struct Mem
         }
     }
 
+    // Load binary file into memory
+    bool LoadFromFile(const std::string& filename, u32 startAddress = 0)
+    {
+        std::ifstream file(filename, std::ios::binary | std::ios::ate);
+        if (!file.is_open())
+        {
+            std::cerr << "Error: Could not open file " << filename << std::endl;
+            return false;
+        }
+
+        // Get file size
+        std::streamsize fileSize = file.tellg();
+        file.seekg(0, std::ios::beg);
+
+        if (startAddress + fileSize > MAX_MEM)
+        {
+            std::cerr << "Error: File size exceeds available memory." << std::endl;
+            return false;
+        }
+
+        // Read file content into memory
+        if (!file.read(reinterpret_cast<char*>(&Data[startAddress]), fileSize))
+        {
+            std::cerr << "Error: Could not read file into memory." << std::endl;
+            return false;
+        }
+
+        return true;
+    }
+
     // Read one Byte from memory
     Byte operator[](u32 Address ) const
     {
@@ -37,7 +71,7 @@ struct CPU
 {
     
     Word PC; //program counter
-    Word SP; //stack pointer
+    Byte SP; //stack pointer. Even though memory is the size of a word, the first to hexadecimals of the SP are always 00, so it can be stored in only a singe byte.
 
     Byte A,X,Y; // registers
 
@@ -53,7 +87,7 @@ struct CPU
     void Reset(Mem &memory)
     {
         PC = 0xFFFC;
-        SP = 0x0100;
+        SP = 0xFF;
 
         C = 0;
         Z = 0;
@@ -99,6 +133,14 @@ struct CPU
         return Data;
     }
 
+    void pushBytetostack(Byte data,u32& Cycles, Mem& memory)
+    {
+        // Assert that the stack pointer is not at it's maximum of 0x01FF
+        memory[SP + 0x100] = data;
+        SP--;
+        Cycles--;
+    }
+
     void SetPC (u32& Cycles, Word Address)
     {
         PC = Address; // may or may not have to be + or - 1
@@ -116,6 +158,7 @@ struct CPU
     static constexpr Byte INS_LDA_IM = 0xA9; // instruction load A immediate ( laad een waarde direct uit de ROM) 2 bytes 2 cycles
     static constexpr Byte INS_LDA_ZP = 0xA5; // instruction load A from zero page. 2 bytes 3 cycles
     static constexpr Byte INS_JMP_ABS = 0x4C; //Jump to absolute address. 3 bytes 3 cycles
+    static constexpr Byte INS_JSR = 0x20; // Jump to SubRoutine. Takes an absolute address(2 Bytes) total 3 bytes. 6 cycles
 
     void Execute(u32 Cycles, Mem & memory) // Cycles: for how many clockcycles do we want to execute?
     {
@@ -148,6 +191,22 @@ struct CPU
     	            SetPC(Cycles,Address); // Set the Program Counter to the desired Address
                     // This instruction does not affect any flags.
                 }break;
+                case INS_JSR:
+                {
+                    Word Address = FetchWord(Cycles, memory); // 2 cycles
+                    // The SP decends, so to use little endian, it must first store the MSB. Who came up with this BS
+                    Byte upperByte = PC >> 8; // extract upper Byte
+                    pushBytetostack(upperByte,Cycles,memory); // one cycle
+                    Byte lowerByte = PC & 0xFF; //extract the lower Byte
+                    pushBytetostack(lowerByte,Cycles,memory); // one cycle
+                    // Push return location without -1 onto the stack.
+                    // in hardware, it makes sense to store PC -1. It doesn't in software.
+                    // set PC to new address ( that of the subroutine ). This is an operation which can be done in a single clock cycle
+                    PC = Address;
+                    Cycles--;
+
+
+                }break;
 
             default:
             {
@@ -165,13 +224,23 @@ int main()
     CPU cpu;
     cpu.Reset(mem);
 
-    //temporarily customize memory
-    mem[0x10] = 0x84;
+    // //temporarily customize memory
+    // mem[0x10] = 0x84;
 
-    mem[0xFFFC] = CPU::INS_LDA_IM;
-    mem[0xFFFD] = 200;
-    mem[0xFFFE] = CPU::INS_LDA_ZP;
-    mem[0xFFFF] = 0x10;
+    // mem[0xFFFC] = CPU::INS_LDA_IM;
+    // mem[0xFFFD] = 200;
+    // mem[0xFFFE] = CPU::INS_LDA_ZP;
+    // mem[0xFFFF] = 0x10;
+    // Load binary file into memory
+    std::string filename = "memory.bin";
+    if (mem.LoadFromFile(filename, 0x8000)) // Load file at address 0x8000
+    {
+        std::cout << "Memory loaded successfully from " << filename << std::endl;
+    }
+    else
+    {
+        std::cerr << "Failed to load memory from file." << std::endl;
+    }
 
     cpu.Execute(2, mem);
     cpu.Execute(3, mem);
