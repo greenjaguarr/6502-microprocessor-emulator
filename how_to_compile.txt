@@ -1,0 +1,1 @@
+g++ -o hallohoihoi .\main_6502.cpp
