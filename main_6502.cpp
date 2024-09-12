@@ -11,6 +11,14 @@ struct Mem
 {
     static constexpr u32 MAX_MEM = 0xFFFF;
     Byte Data[MAX_MEM];
+
+    void Initialise()
+    {
+        for (u32 i = 0x0000; i<MAX_MEM; i++) //moet dit niet i<= MAX_MEM zijn?
+        {
+            Data[i] = 0x00;
+        }
+    }
 };
 
 struct CPU
@@ -30,7 +38,7 @@ struct CPU
     Byte V : 1; // overflow flag
     Byte N : 1; // negative flag
 
-    void Reset()
+    void Reset(Mem &memory)
     {
         PC = 0xFFFC;
         SP = 0x0100;
@@ -46,13 +54,16 @@ struct CPU
         A = 0x00;
         X = 0x00;
         Y = 0x00;
+
+        memory.Initialise();
     };
 };
 
 int main()
 {
-
+    Mem mem;
     CPU cpu;
+    cpu.Reset(mem);
     return 0;
 
 }
