@@ -26,6 +26,11 @@ struct Mem
         // assert here that Address is 0 <= Address < MAX_MEM
         return Data[Address];
     }
+    // Write one Byte to memory
+    Byte &operator[](u32 Address) 
+    {
+        return Data[Address];
+    }
 };
 
 struct CPU
@@ -93,8 +98,13 @@ struct CPU
                     // set zero flag if neccesary
                     Z = ((A==0x00) ? true : false);
                     N = (((A & 0x80) == 0x80) ? true : false);
-                }
-            break; // The instruction was not found. Make the cpu crash
+                }break; // The instruction was not found. Make the cpu crash
+
+            default:
+            {
+                printf("Instruction not handled %d", Instruction);
+            }
+                break;
             }
         }
     }
@@ -105,6 +115,11 @@ int main()
     Mem mem;
     CPU cpu;
     cpu.Reset(mem);
+
+    //temporarily customize memory
+    mem[0xFFFC] = CPU::INS_LDA_IM;
+    mem[0xFFFD] = 0xAA;
+
     cpu.Execute(2, mem);
     return 0;
 
