@@ -3,6 +3,9 @@
 
 // http://www.obelisk.me.uk/6502/
 
-int main(){
+int main()
+{
+
     return 0;
+    
 }
