@@ -27,6 +27,11 @@ int main()
     memory[0x0000] = 0xA9; // LDA #$55
     memory[0x0001] = 0x55; // Load 0x55 into A
 
+    // loop
+    memory[0x0002] = 0x4C; // JMP to 0x0002
+    memory[0x3] = 0x02;
+    memory[0x4] = 0x00;
+
     // Set the Reset Vector (little-endian) to 0x8000
     memory[0x7FFC] = 0x00;
     memory[0x7FFD] = 0x80;

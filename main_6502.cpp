@@ -247,7 +247,7 @@ int main()
     CPU cpu;
     cpu.Reset(mem);
 
-    cpu.Execute(2, mem); // dit moet op dit moment het precieze aantal clock cycles weten van tevoren.
+    cpu.Execute(100, mem); // dit moet op dit moment het precieze aantal clock cycles weten van tevoren.
     return 0;
 
 }
