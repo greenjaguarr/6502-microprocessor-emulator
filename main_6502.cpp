@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 // http://www.obelisk.me.uk/6502/
+// https://www.youtube.com/watch?v=qJgsuQoy9bc
 
 using u32 = unsigned int;
 using Byte = unsigned char;
