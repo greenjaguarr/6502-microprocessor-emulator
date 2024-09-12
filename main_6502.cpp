@@ -78,7 +78,23 @@ struct CPU
         return Data;
     }
 
+    Byte ReadByte (u32& Cycles, Mem& memory, Word address)
+    {
+        Byte Data = memory[address];
+        Cycles--;
+        return Data;
+    }
+
+    void LDASetStatus()
+    {
+        // set zero flag if neccesary
+        Z = ((A==0x00) ? true : false);
+        // set negative flag if neccesary
+        N = (((A & 0x80) == 0x80) ? true : false);
+    }
+
     static constexpr Byte INS_LDA_IM = 0xA9; // instruction load A immediate ( laad een waarde direct uit de ROM)
+    static constexpr Byte INS_LDA_ZP = 0xA5; // instruction load A from zero page. 
 
     void Execute(u32 Cycles, Mem & memory) // Cycles: for how many clockcycles do we want to execute?
     {
@@ -90,21 +106,27 @@ struct CPU
             // set 2: execute instruction. We swich here based on what instruction is fetched
             switch (Instruction)
             {
-                case INS_LDA_IM:
+                case INS_LDA_IM: // load A immediate
                 {
                     Byte operand = FetchByte (Cycles, memory);
                     // store value in A register
                     A = operand;
-                    // set zero flag if neccesary
-                    Z = ((A==0x00) ? true : false);
-                    N = (((A & 0x80) == 0x80) ? true : false);
-                }break; // The instruction was not found. Make the cpu crash
+                    LDASetStatus();
+                }break;
+                case INS_LDA_ZP: // load A from zero page
+                {
+                    Byte operand = FetchByte (Cycles, memory); // operand indicates where in the zero page, the value is located
+                    Word address = 0x0000 | operand;  //yt vid doet dit niet????
+                    Byte value = ReadByte(Cycles, memory, address);
+                    A = value;
+                    LDASetStatus();
+                }break;
 
             default:
             {
                 printf("Instruction not handled %d", Instruction);
             }
-                break;
+                break; // The instruction was not found. Make the cpu crash
             }
         }
     }
@@ -118,9 +140,12 @@ int main()
 
     //temporarily customize memory
     mem[0xFFFC] = CPU::INS_LDA_IM;
-    mem[0xFFFD] = 0xAA;
+    mem[0xFFFD] = 200;
+    mem[0xFFFE] = CPU::INS_LDA_ZP;
+    mem[0xFFFF] = 0x10;
 
     cpu.Execute(2, mem);
+    cpu.Execute(3, mem);
     return 0;
 
 }
