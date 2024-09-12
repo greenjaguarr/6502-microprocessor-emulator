@@ -251,7 +251,7 @@ int main()
     // Load binary file into memory
 
     cpu.Execute(2, mem);
-    cpu.Execute(3, mem);
+    // cpu.Execute(3, mem);
     return 0;
 
 }
