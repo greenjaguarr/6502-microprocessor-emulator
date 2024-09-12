@@ -70,6 +70,20 @@ struct CPU
         memory.Initialise();
     };
 
+    Word FetchWord(u32& Cycles, Mem& memory)
+    {
+        //6502 is little endian
+        //First grab the low byte
+        Word Data = memory[PC]; // It doesnt matter that memory[] only gives a byte
+        PC++;
+        Cycles--;
+        // Next we grab the high byte. To combine, we use the OR operator
+        Data |= (memory[PC] << 8);
+        PC++;
+        Cycles--;
+        return Data;
+    }
+
     Byte FetchByte(u32& Cycles, Mem& memory)
     {
         Byte Data = memory[PC];
@@ -85,6 +99,12 @@ struct CPU
         return Data;
     }
 
+    void SetPC (u32& Cycles, Word Address)
+    {
+        PC = Address; // may or may not have to be + or - 1
+        Cycles--; // Setting the program counter takes one clock cycle
+    }
+
     void LDASetStatus()
     {
         // set zero flag if neccesary
@@ -93,8 +113,9 @@ struct CPU
         N = (((A & 0x80) == 0x80) ? true : false);
     }
 
-    static constexpr Byte INS_LDA_IM = 0xA9; // instruction load A immediate ( laad een waarde direct uit de ROM)
-    static constexpr Byte INS_LDA_ZP = 0xA5; // instruction load A from zero page. 
+    static constexpr Byte INS_LDA_IM = 0xA9; // instruction load A immediate ( laad een waarde direct uit de ROM) 2 bytes 2 cycles
+    static constexpr Byte INS_LDA_ZP = 0xA5; // instruction load A from zero page. 2 bytes 3 cycles
+    static constexpr Byte INS_JMP_ABS = 0x4C; //Jump to absolute address. 3 bytes 3 cycles
 
     void Execute(u32 Cycles, Mem & memory) // Cycles: for how many clockcycles do we want to execute?
     {
@@ -121,6 +142,12 @@ struct CPU
                     A = value;
                     LDASetStatus();
                 }break;
+                case INS_JMP_ABS:
+                {
+                    Word Address = FetchWord(Cycles, memory); // it takes 2 cycles to fetch a Word
+    	            SetPC(Cycles,Address); // Set the Program Counter to the desired Address
+                    // This instruction does not affect any flags.
+                }break;
 
             default:
             {
@@ -139,6 +166,8 @@ int main()
     cpu.Reset(mem);
 
     //temporarily customize memory
+    mem[0x10] = 0x84;
+
     mem[0xFFFC] = CPU::INS_LDA_IM;
     mem[0xFFFD] = 200;
     mem[0xFFFE] = CPU::INS_LDA_ZP;
