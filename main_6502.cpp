@@ -172,6 +172,8 @@ struct CPU
         N = (((A & 0x80) == 0x80) ? true : false);
     }
 
+//http://www.6502.org/tutorials/6502opcodes.html
+
     static constexpr Byte INS_LDA_IM = 0xA9; // instruction load A immediate ( laad een waarde direct uit de ROM) 2 bytes 2 cycles
     static constexpr Byte INS_LDA_ZP = 0xA5; // instruction load A from zero page. 2 bytes 3 cycles
     static constexpr Byte INS_JMP_ABS = 0x4C; //Jump to absolute address. 3 bytes 3 cycles
