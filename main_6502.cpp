@@ -176,6 +176,7 @@ struct CPU
     static constexpr Byte INS_LDA_ZP = 0xA5; // instruction load A from zero page. 2 bytes 3 cycles
     static constexpr Byte INS_JMP_ABS = 0x4C; //Jump to absolute address. 3 bytes 3 cycles
     static constexpr Byte INS_JSR = 0x20; // Jump to SubRoutine. Takes an absolute address(2 Bytes) total 3 bytes. 6 cycles
+    static constexpr Byte INS_NOP = 0xEA; // The no-op instruction
 
     void Execute(u32 Cycles, Mem & memory) // Cycles: for how many clockcycles do we want to execute?
     {
@@ -224,6 +225,11 @@ struct CPU
 
 
                 }break;
+                case INS_NOP:
+                {
+                    // This means to do nothing
+                    // The PC is already incremented by reading the NOP instruction and the reading already consumes a cycle
+                }break;
 
             default:
             {
@@ -241,17 +247,7 @@ int main()
     CPU cpu;
     cpu.Reset(mem);
 
-    // //temporarily customize memory
-    // mem[0x10] = 0x84;
-
-    // mem[0xFFFC] = CPU::INS_LDA_IM;
-    // mem[0xFFFD] = 200;
-    // mem[0xFFFE] = CPU::INS_LDA_ZP;
-    // mem[0xFFFF] = 0x10;
-    // Load binary file into memory
-
-    cpu.Execute(2, mem);
-    // cpu.Execute(3, mem);
+    cpu.Execute(2, mem); // dit moet op dit moment het precieze aantal clock cycles weten van tevoren.
     return 0;
 
 }

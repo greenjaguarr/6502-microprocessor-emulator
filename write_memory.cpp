@@ -13,7 +13,7 @@ int main()
     Byte memory[MAX_MEM];
     for (u32 i = 0; i < MAX_MEM; i++)
     {
-        memory[i] = 0x00;
+        memory[i] = 0xEA; // The default option is NOP ( no operation ) this simple skips a clockcycle
     }
     
     // Memory layout:
