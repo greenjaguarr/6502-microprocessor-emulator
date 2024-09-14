@@ -22,6 +22,16 @@ struct Mem
         {
             Data[i] = 0x00;
         }
+
+        std::string filename = "memory.bin";
+        if (LoadFromFile(filename, 0x8000)) // Load file at address 0x8000
+        {
+            std::cout << "Memory loaded successfully from " << filename << std::endl;
+        }
+        else
+        {
+            std::cerr << "Failed to load memory from file." << std::endl;
+        }
     }
 
     // Load binary file into memory
@@ -104,15 +114,7 @@ struct CPU
         memory.Initialise();
 
 
-        std::string filename = "memory.bin";
-        if (memory.LoadFromFile(filename, 0x8000)) // Load file at address 0x8000
-        {
-            std::cout << "Memory loaded successfully from " << filename << std::endl;
-        }
-        else
-        {
-            std::cerr << "Failed to load memory from file." << std::endl;
-        }
+
 
         // Do the startup sequence. Now i am just cheating by directly reading where the PC should start
         Byte lowerStartAddress = memory[0xFFFC];
