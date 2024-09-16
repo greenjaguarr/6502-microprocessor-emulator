@@ -182,12 +182,20 @@ struct CPU
         Cycles--; // Setting the program counter takes one clock cycle
     }
 
-    void LDASetStatus()
+    void SetStatusNZbasedonA()
     {
         // set zero flag if neccesary
         Z = ((A==0x00) ? true : false);
         // set negative flag if neccesary
         N = (((A & 0x80) == 0x80) ? true : false);
+    }
+
+    void SetStatusNZbasedonX()
+    {
+        // set zero flag if neccesary
+        Z = ((X==0x00) ? true : false);
+        // set negative flag if neccesary
+        N = (((X & 0x80) == 0x80) ? true : false);
     }
 
     void ADC(Byte operand) // This happens internally and takes NO cycles
@@ -225,12 +233,19 @@ struct CPU
     static constexpr Byte INS_ASL_A = 0x0A; // arithmatic shift left. bit0=0, C=bit7        1 byte  2 cycles
     static constexpr Byte INS_STA_ABS = 0x8D; // store A intoRAM(TODOmakeonlytop8Kwritable) 3 bytes 4 cycles
     static constexpr Byte INS_RTS = 0x60; // return from subroutine. load PC from stack.    1 byte  6 cycles
-
+    static constexpr Byte INS_LSR_A = 0x4A; // logical shift right. bit7=0 C=bit0           1 byte  2 cycles
+    static constexpr Byte INS_STA_ABSX = 0x9D; //sta a address abs + the value in the x reg 3 bytes 5 cycles
+    static constexpr Byte INS_LDX_IM = 0xA2; // load X with immediate value. loops?         2 bytes 2 cycles
+    static constexpr Byte INS_INX = 0xE8; // increment X register                           1 btye  2 cycles
+    static constexpr Byte INS_LDA_ABS = 0xAD; // load A abs                                 3 bytes 4 cycles
 
     void Execute(u32 Cycles, Mem & memory) // Cycles: for how many clockcycles do we want to execute?
     {
-        while (Cycles > 0)
+        const u32 STARTCYCLES = Cycles;
+        while ((Cycles > 0) && (Cycles<= STARTCYCLES))
         {
+            // debug info
+            // std::cout << "[DEBUG]" << Cycles << std::endl;
             // step 1: fetch next instruction from memory
             Byte Instruction = FetchByte (Cycles, memory);
 
@@ -264,7 +279,14 @@ struct CPU
                     C = A & 0x80; // Store bit 7 in Carry flag
                     A =  A << 1; // shift left 1
                     Cycles--; // this costs 1 cycle
+                    SetStatusNZbasedonA();
                     
+                }break;
+                case INS_INX:
+                {
+                    X += 1; // increment the X register
+                    Cycles--; // increment takes 1 cycle
+                    SetStatusNZbasedonX(); // setstatus
                 }break;
                 case INS_JMP_ABS:
                 {
@@ -291,7 +313,7 @@ struct CPU
                     Byte operand = FetchByte (Cycles, memory);
                     // store value in A register
                     A = operand;
-                    LDASetStatus();
+                    SetStatusNZbasedonA();
                 }break;
                 case INS_LDA_ZP: // load A from zero page
                 {
@@ -299,7 +321,21 @@ struct CPU
                     Word address = 0x0000 | operand;  //yt vid doet dit niet????
                     Byte value = ReadByte(Cycles, memory, address);
                     A = value;
-                    LDASetStatus();
+                    SetStatusNZbasedonA();
+                }break;
+                case INS_LDA_ABS:
+                {
+                    Word address = FetchWord(Cycles, memory); // Fetch the address where the value is located. 2 cycles
+                    Byte value = ReadByte(Cycles, memory, address); // 1 cycle
+                    A = value;
+                    SetStatusNZbasedonA();
+                }break;
+                case INS_LDX_IM:
+                {
+                    Byte operand = FetchByte (Cycles, memory);
+                    // store value in X register
+                    X = operand;
+                    SetStatusNZbasedonX();
                 }break;
                 case INS_NOP:
                 {
@@ -314,6 +350,17 @@ struct CPU
                     // ROM = 0x8000-0xFFFF is read-only
 
                 }break;
+                case INS_STA_ABSX:
+                {
+                    Word base_address = FetchWord(Cycles,memory); // 2 cycles
+                    Word Address = base_address + X; // add value of the X register to the address
+                    Cycles--; // this adding of X takes 1-2 cycles depending on wether or not the address crosses into another page
+                    Byte basepage = base_address >> 8;
+                    Byte resultpage = Address >> 8;
+                    if (basepage != resultpage){Cycles--;} // check for the crossing of the page
+                    StoreByte(Cycles, memory, A, Address); // store A in the address.
+
+                }break;
                 case INS_RTS:
                 {
                     Byte lowerAddress = pullBytefromStack(Cycles,memory); // takes 1 cycle
@@ -321,6 +368,13 @@ struct CPU
                     Word Address = upperAddress << 8 | lowerAddress;
                     SetPC(Cycles, Address); // takes 1 cycle
 
+                }break;
+                case INS_LSR_A:
+                {
+                    C = A & 0x01; // set the carry flag
+                    A = A >> 1; // shift right 1
+                    Cycles--;
+                    SetStatusNZbasedonA();
                 }break;
 
             default:
@@ -330,8 +384,22 @@ struct CPU
                 break; // The instruction was not found. Make the cpu crash
             }
         }
+
+    }
+
+    void store_output_file(Mem & memory)
+    {
+        std::ofstream outputFile("output.bin", std::ios::binary); // open a binary file. This is something we can write to
+        // check if the file was succesfully opened. Idk why this is neccesary
+        if (!outputFile) { std::cerr << "Error opening file!" << std::endl; return;}
+        // write the stuff
+        outputFile.write(reinterpret_cast<const char*> (&memory[0x6000]), 0x1000);
+        outputFile.close();
+        return;
     }
 };
+
+
 
 int main()
 {
@@ -339,7 +407,11 @@ int main()
     CPU cpu;
     cpu.Reset(mem);
 
-    cpu.Execute(100, mem); // dit moet op dit moment het precieze aantal clock cycles weten van tevoren.
+    cpu.Execute(500, mem); // dit moet op dit moment het precieze aantal clock cycles weten van tevoren.
+    
+    // In this CPU, memory address 0x6000-0x6FFF is reserved for output.
+    cpu.store_output_file(mem);
+    
     return 0;
 
 }
