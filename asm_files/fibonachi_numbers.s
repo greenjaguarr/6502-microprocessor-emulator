@@ -13,6 +13,7 @@
 step1:
     lda $0200
     adc $0201
+    bvs loop ; branch if overflow set to loop, where the program is halted
     sta $0200
     jsr store_val
 
@@ -21,14 +22,12 @@ step1:
 step2:
     lda $0201
     adc $0200
+    bvs loop ; branch if overflow set to loop, where the program is halted
     sta $0201
     jsr store_val
 
     jmp step1
 
-;halt
-loop:
-    jmp loop
 
 
 store_val:
@@ -36,6 +35,9 @@ store_val:
     inx ;increment X
     rts
 
+;halt
+loop:
+    jmp loop
 
     .org $FFFC
     .word $8000

@@ -138,7 +138,7 @@ struct CPU
         return Data;
     }
 
-    Byte FetchByte(u32& Cycles, Mem& memory)
+    Byte FetchByte(u32& Cycles, Mem& memory) // 1 cycle
     {
         Byte Data = memory[PC];
         PC++;
@@ -176,10 +176,38 @@ struct CPU
         return data;
     }
 
-    void SetPC (u32& Cycles, Word Address)
+    void SetPC_absolute (u32& Cycles, Word Address)
     {
         PC = Address; // may or may not have to be + or - 1
         Cycles--; // Setting the program counter takes one clock cycle
+    }
+
+    void SetPC_relative(u32 & Cycles, Byte offset) // offset is signed TODO
+    {
+        Word previous_PC = PC;
+        // offset is signed. compensate for this
+        bool signBit = (offset >= 0x80); // check for the sign bit = -128 place
+        if (signBit)
+        {
+            offset = offset && 0x7F; // remove the first bit
+            PC += offset; // add the offset to theprogram counter
+            PC -= 0x80; // subtract 128 from the program counter for the sign bit
+            Cycles--;
+        } else{
+            PC += offset; // add value of the offset to jmp around in the program
+            Cycles--;
+        }
+        // offset = offset - 0x80;} // remove the leading bit
+        // PC += offset; // add the offset first
+        // Cycles--; // this takes one cycle
+        // if (signBit == true ) { // 2nd add the sign. This is in the same cycle as step 1
+        //     PC-=128;
+        // }
+        // check for if a PAGE boundy is crossed
+        if ((previous_PC >> 8 ) != (PC >> 8)){
+            Cycles--;
+        }
+        // PC--; // compensate for that the PC has to run ( idk what this means when i wrote it)
     }
 
     void SetStatusNZbasedonA()
@@ -238,6 +266,9 @@ struct CPU
     static constexpr Byte INS_LDX_IM = 0xA2; // load X with immediate value. loops?         2 bytes 2 cycles
     static constexpr Byte INS_INX = 0xE8; // increment X register                           1 btye  2 cycles
     static constexpr Byte INS_LDA_ABS = 0xAD; // load A abs                                 3 bytes 4 cycles
+    static constexpr Byte INS_BVS = 0x70; // branch if overflow is set                      2 bytes weird amount of cycles
+
+
 
     void Execute(u32 Cycles, Mem & memory) // Cycles: for how many clockcycles do we want to execute?
     {
@@ -245,7 +276,7 @@ struct CPU
         while ((Cycles > 0) && (Cycles<= STARTCYCLES))
         {
             // debug info
-            // std::cout << "[DEBUG]" << Cycles << std::endl;
+            std::cout << "[DEBUG]" << Cycles << std::endl;
             // step 1: fetch next instruction from memory
             Byte Instruction = FetchByte (Cycles, memory);
 
@@ -291,7 +322,7 @@ struct CPU
                 case INS_JMP_ABS:
                 {
                     Word Address = FetchWord(Cycles, memory); // it takes 2 cycles to fetch a Word
-    	            SetPC(Cycles,Address); // Set the Program Counter to the desired Address
+    	            SetPC_absolute(Cycles,Address); // Set the Program Counter to the desired Address
                     // This instruction does not affect any flags.
                 }break;
                 case INS_JSR:
@@ -325,8 +356,8 @@ struct CPU
                 }break;
                 case INS_LDA_ABS:
                 {
-                    Word address = FetchWord(Cycles, memory); // Fetch the address where the value is located. 2 cycles
-                    Byte value = ReadByte(Cycles, memory, address); // 1 cycle
+                    Word Address = FetchWord(Cycles, memory); // Fetch the address where the value is located. 2 cycles
+                    Byte value = ReadByte(Cycles, memory, Address); // 1 cycle
                     A = value;
                     SetStatusNZbasedonA();
                 }break;
@@ -366,7 +397,7 @@ struct CPU
                     Byte lowerAddress = pullBytefromStack(Cycles,memory); // takes 1 cycle
                     Byte upperAddress = pullBytefromStack(Cycles, memory); // takes 1 cycle
                     Word Address = upperAddress << 8 | lowerAddress;
-                    SetPC(Cycles, Address); // takes 1 cycle
+                    SetPC_absolute(Cycles, Address); // takes 1 cycle
 
                 }break;
                 case INS_LSR_A:
@@ -375,6 +406,16 @@ struct CPU
                     A = A >> 1; // shift right 1
                     Cycles--;
                     SetStatusNZbasedonA();
+                }break;
+                case INS_BVS:
+                {
+                    Byte offset = FetchByte(Cycles,memory); // 1 cycle
+                    if (V == 1)
+                    {
+                        SetPC_relative(Cycles, offset); // 1 cycle always + 1 cycle if PAGE is crossed
+                    } else {
+                        ;
+                    }
                 }break;
 
             default:
