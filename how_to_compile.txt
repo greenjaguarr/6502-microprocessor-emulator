@@ -3,6 +3,10 @@ g++ -o makememory .\write_memory.cpp
 g++ -o hallohoihoi .\main_6502.cpp                                                     
 .\hallohoihoi.exe
 in order to compile/assemble an ASM file, use:
-vasm6502_oldstyle -Fbin -dotdir -o binary.out assembler.s
+vasm6502_oldstyle -Fbin -dotdir -o binary.out assembly.s
 a hexdump can be used to check the output file:
 hexdump -C binary.out
+
+
+januari 2025
+g++ -o main main_6502.cpp && ./main

@@ -13,6 +13,8 @@ using u32 = unsigned int;
 using Byte = unsigned char;
 using Word = unsigned short;
 
+#define DEBUG false
+
 
 class Mem {
 protected:
@@ -212,6 +214,9 @@ struct CPU
     {
         memory.Write(address ,value); // This takes a lot of C++ syntax to actually make happen
         Cycles--; // This operation takes 1 cycle
+        if (DEBUG){
+            std::cout << "[DEBUG] Wrote Byte to " << std::hex << address << " value " << std::dec << (int)value << std::endl;
+        }
     }
 
     void pushBytetoStack(Byte data,u32& Cycles, UnifiedMemory& memory)
@@ -330,7 +335,9 @@ struct CPU
         while ((Cycles > 0) && (Cycles<= STARTCYCLES))
         {
             // debug info
-            std::cout << "[DEBUG]" << Cycles << std::endl;
+            if (DEBUG){
+                std::cout << "[DEBUG]" << Cycles << std::endl;
+            }
             // step 1: fetch next instruction from memory
             Byte Instruction = FetchByte (Cycles, memory);
 
@@ -488,7 +495,7 @@ struct CPU
         // check if the file was succesfully opened. Idk why this is neccesary
         if (!outputFile) { std::cerr << "Error opening file!" << std::endl; return;}
         // Write the memory contents from 0x6000 to 0x6FFF to the file
-        for (Word address = 0x6000; address <= 0x6FFF; ++address) {
+        for (Word address = 0x2000; address <= 0x3FFF; ++address) {
             Byte data = memory.Read(address);
             outputFile.write(reinterpret_cast<char*>(&data), sizeof(Byte));
         }
