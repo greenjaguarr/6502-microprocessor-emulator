@@ -10,3 +10,5 @@ hexdump -C binary.out
 
 januari 2025
 g++ -o main main_6502.cpp && ./main
+vasm6502_oldstyle -Fbin -dotdir -o memory.bin asm_files/fibonachi_numbers.s
+hexdump -C output.bin
