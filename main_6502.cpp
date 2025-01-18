@@ -12,35 +12,98 @@
 using u32 = unsigned int;
 using Byte = unsigned char;
 using Word = unsigned short;
-struct Mem
-{
-    static constexpr u32 MAX_MEM = 65536; // range van 0x0000 tot 0xFFFF
-    Byte Data[MAX_MEM];
+// struct Mem
+// {
+//     static constexpr u32 MAX_MEM = 65536; // range van 0x0000 tot 0xFFFF
+//     Byte Data[MAX_MEM];
 
-    void Initialise()
-    {
-        for (u32 i = 0x0000; i<MAX_MEM; i++) 
-        {
-            Data[i] = 0x00;
-        }
+//     void Initialise()
+//     {
+//         for (u32 i = 0x0000; i<MAX_MEM; i++) 
+//         {
+//             Data[i] = 0x00;
+//         }
 
-        std::string filename = "memory.bin";
-        if (LoadFromFile(filename, 0x8000)) // Load file at address 0x8000
-        {
-            std::cout << "Memory loaded successfully from " << filename << std::endl;
+//         std::string filename = "memory.bin";
+//         if (LoadFromFile(filename, 0x8000)) // Load file at address 0x8000
+//         {
+//             std::cout << "Memory loaded successfully from " << filename << std::endl;
+//         }
+//         else
+//         {
+//             std::cerr << "Failed to load memory from file." << std::endl;
+//         }
+//     }
+
+//     // Load binary file into memory
+//     bool LoadFromFile(const std::string& filename, u32 startAddress = 0)
+//     {
+//         std::ifstream file(filename, std::ios::binary | std::ios::ate);
+//         if (!file.is_open())
+//         {
+//             std::cerr << "Error: Could not open file " << filename << std::endl;
+//             return false;
+//         }
+
+//         // Get file size
+//         std::streamsize fileSize = file.tellg();
+//         file.seekg(0, std::ios::beg);
+
+//         if (startAddress + fileSize > MAX_MEM)
+//         {
+//             std::cerr << "Error: File size exceeds available memory." << std::endl;
+//             return false;
+//         }
+
+//         // Read file content into memory
+//         if (!file.read(reinterpret_cast<char*>(&Data[startAddress]), fileSize))
+//         {
+//             std::cerr << "Error: Could not read file into memory." << std::endl;
+//             return false;
+//         }
+
+//         return true;
+//     }
+
+//     // Read one Byte from memory
+//     Byte operator[](u32 Address ) const
+//     {
+//         // assert here that Address is 0 <= Address < MAX_MEM
+//         return Data[Address];
+//     }
+//     // Write one Byte to memory
+//     Byte &operator[](u32 Address) 
+//     {
+//         return Data[Address];
+//     }
+// };
+
+class Mem {
+protected:
+    std::vector<Byte> memory;
+    Word start_address, end_address;
+public:
+    Mem(Word start, Word end) 
+        : start_address(start), end_address(end), memory(end - start + 1, 0) {}
+
+    virtual Byte Read(Byte address) {
+        if (address < start_address || address > end_address) {
+            throw std::out_of_range("Address out of range");
         }
-        else
-        {
-            std::cerr << "Failed to load memory from file." << std::endl;
-        }
+        return memory[address - start_address];
     }
 
-    // Load binary file into memory
-    bool LoadFromFile(const std::string& filename, u32 startAddress = 0)
-    {
+    virtual void Write(Word address, Byte value) {
+        if (address < start_address || address > end_address) {
+            throw std::out_of_range("Address out of range");
+        }
+        memory[address - start_address] = value;
+    }
+
+    // Load binary file into ROM
+    bool LoadFromFile(const std::string& filename) {
         std::ifstream file(filename, std::ios::binary | std::ios::ate);
-        if (!file.is_open())
-        {
+        if (!file.is_open()) {
             std::cerr << "Error: Could not open file " << filename << std::endl;
             return false;
         }
@@ -49,34 +112,48 @@ struct Mem
         std::streamsize fileSize = file.tellg();
         file.seekg(0, std::ios::beg);
 
-        if (startAddress + fileSize > MAX_MEM)
-        {
-            std::cerr << "Error: File size exceeds available memory." << std::endl;
+        if (start < start_address || start + fileSize > end_address + 1) {
+            std::cerr << "Error: File size exceeds ROM address space." << std::endl;
             return false;
         }
 
-        // Read file content into memory
-        if (!file.read(reinterpret_cast<char*>(&Data[startAddress]), fileSize))
-        {
-            std::cerr << "Error: Could not read file into memory." << std::endl;
+        // Read file content into ROM memory
+        if (!file.read(reinterpret_cast<char*>(&memory[startAddress - start_address]), fileSize)) {
+            std::cerr << "Error: Could not read file into ROM." << std::endl;
             return false;
         }
 
+        std::cout << "Memory loaded successfully from " << filename << std::endl;
         return true;
     }
 
-    // Read one Byte from memory
-    Byte operator[](u32 Address ) const
-    {
-        // assert here that Address is 0 <= Address < MAX_MEM
-        return Data[Address];
-    }
-    // Write one Byte to memory
-    Byte &operator[](u32 Address) 
-    {
-        return Data[Address];
-    }
+
+
+    virtual ~Mem() = default;
 };
+
+class RAM : public Mem {
+public:
+    RAM(Word start, Word end) : Mem(start, end) {}
+};
+
+class ROM : public Mem {
+public:
+    ROM(Word start, Word end) : Mem(start, end) {}
+
+    void Write(Word address, Byte value) override {
+        throw std::runtime_error("Cannot write to ROM");
+    }
+
+    // void LoadData(const std::vector<uint8_t>& data) {
+    //     if (data.size() > memory.size()) {
+    //         throw std::runtime_error("Data too large for ROM");
+    //     }
+    //     std::copy(data.begin(), data.end(), memory.begin());
+    // }
+};
+
+
 
 struct CPU
 {
@@ -444,14 +521,22 @@ struct CPU
 
 int main()
 {
-    Mem mem;
+    ROM rom(0x8000,0xffff);
+    RAM ram(0x0000,0x3fff);
     CPU cpu;
-    cpu.Reset(mem);
+    cpu.Reset(rom);
+    cpu.Reset(ram);
 
-    cpu.Execute(500, mem); // dit moet op dit moment het precieze aantal clock cycles weten van tevoren.
+        // Initialize ROM with memory.bin
+    if (!rom.LoadFromFile("memory.bin")) {
+        std::cerr << "Failed to load ROM data. Exiting." << std::endl;
+        return 1;
+    }
+
+    cpu.Execute(500, rom); // dit moet op dit moment het precieze aantal clock cycles weten van tevoren.
     
     // In this CPU, memory address 0x6000-0x6FFF is reserved for output.
-    cpu.store_output_file(mem);
+    cpu.store_output_file(rom);
     
     return 0;
 
