@@ -5,6 +5,10 @@
 #include <fstream>
 #include <vector>
 
+// #include "./build/memory_bin.h"
+#include <cstring>
+#include "/home/mark/Documents/project_6502/build/memory_bin.h" 
+
 // http://www.obelisk.me.uk/6502/
 // https://www.youtube.com/watch?v=qJgsuQoy9bc
 // http://www.6502.org/tutorials/6502opcodes.html
@@ -121,29 +125,9 @@ public:
         }
     }
 
-    bool LoadROM(const std::string &filename) {
-        std::ifstream file(filename, std::ios::binary ); // | std::ios::ate
-        if (!file.is_open()) {
-            std::cerr << "Error: Could not open file " << filename << std::endl;
-            return false;
-        };
-
-        std::streamsize fileSize = file.tellg();
-        file.seekg(0, std::ios::beg);
-
-        // if (fileSize > rom.GetSize()) {
-        //     std::cerr << "Error: ROM file is too large" << std::endl;
-        //     return false;
-        // }
-
-        std::vector<Byte> buffer(fileSize);
-        if (file.read(reinterpret_cast<char *>(buffer.data()), fileSize)) {
-            rom.LoadData(buffer);
-            return true;
-        }
-
-        return false;
-    };
+    void LoadFromFile(const std::vector<Byte>& data){
+        rom.LoadFromFile()
+    }
 
 };
 
@@ -166,7 +150,7 @@ struct CPU
     Byte N : 1; // negative flag
 
     void Reset(UnifiedMemory &memory) {
-        PC = 0x10;
+        PC = 0xFFFC;
         SP = 0xFF;
 
         // Reset flags and registers
@@ -491,7 +475,7 @@ struct CPU
 
     void store_output_file(UnifiedMemory & memory)
     {
-        std::ofstream outputFile("build/output.bin", std::ios::binary); // open a binary file. This is something we can write to
+        std::ofstream outputFile("output.bin", std::ios::binary); // open a binary file. This is something we can write to
         // check if the file was succesfully opened. Idk why this is neccesary
         if (!outputFile) { std::cerr << "Error opening file!" << std::endl; return;}
         // Write the memory contents from 0x6000 to 0x6FFF to the file
@@ -504,16 +488,13 @@ struct CPU
 };
 
 
+
 int main() {
     // Initialize UnifiedMemory which combines ROM, RAM, and I/O
     UnifiedMemory memory;
 
     // Load the ROM into memory
-    if (!memory.LoadROM("memory.bin")) { // could be .bin or .out
-        std::cerr << "Failed to load ROM data. Exiting." << std::endl;
-        return 1;
-    }
-
+    memory.LoadFromFile("");
     // Initialize the CPU and reset it
     CPU cpu;
     cpu.Reset(memory);
@@ -524,6 +505,6 @@ int main() {
 
     // Store the output in a file from memory region 0x6000-0x6FFF
     cpu.store_output_file(memory);
-    std::cout << "Execution completed and output saved to 'build/output.bin'." << std::endl;
+
     return 0;
 };
