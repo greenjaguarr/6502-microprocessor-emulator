@@ -12,71 +12,7 @@
 using u32 = unsigned int;
 using Byte = unsigned char;
 using Word = unsigned short;
-// struct Mem
-// {
-//     static constexpr u32 MAX_MEM = 65536; // range van 0x0000 tot 0xFFFF
-//     Byte Data[MAX_MEM];
 
-//     void Initialise()
-//     {
-//         for (u32 i = 0x0000; i<MAX_MEM; i++) 
-//         {
-//             Data[i] = 0x00;
-//         }
-
-//         std::string filename = "memory.bin";
-//         if (LoadFromFile(filename, 0x8000)) // Load file at address 0x8000
-//         {
-//             std::cout << "Memory loaded successfully from " << filename << std::endl;
-//         }
-//         else
-//         {
-//             std::cerr << "Failed to load memory from file." << std::endl;
-//         }
-//     }
-
-//     // Load binary file into memory
-//     bool LoadFromFile(const std::string& filename, u32 startAddress = 0)
-//     {
-//         std::ifstream file(filename, std::ios::binary | std::ios::ate);
-//         if (!file.is_open())
-//         {
-//             std::cerr << "Error: Could not open file " << filename << std::endl;
-//             return false;
-//         }
-
-//         // Get file size
-//         std::streamsize fileSize = file.tellg();
-//         file.seekg(0, std::ios::beg);
-
-//         if (startAddress + fileSize > MAX_MEM)
-//         {
-//             std::cerr << "Error: File size exceeds available memory." << std::endl;
-//             return false;
-//         }
-
-//         // Read file content into memory
-//         if (!file.read(reinterpret_cast<char*>(&Data[startAddress]), fileSize))
-//         {
-//             std::cerr << "Error: Could not read file into memory." << std::endl;
-//             return false;
-//         }
-
-//         return true;
-//     }
-
-//     // Read one Byte from memory
-//     Byte operator[](u32 Address ) const
-//     {
-//         // assert here that Address is 0 <= Address < MAX_MEM
-//         return Data[Address];
-//     }
-//     // Write one Byte to memory
-//     Byte &operator[](u32 Address) 
-//     {
-//         return Data[Address];
-//     }
-// };
 
 class Mem {
 protected:
@@ -86,7 +22,7 @@ public:
     Mem(Word start, Word end) 
         : start_address(start), end_address(end), memory(end - start + 1, 0) {}
 
-    virtual Byte Read(Byte address) {
+    virtual Byte Read(Word address) {
         if (address < start_address || address > end_address) {
             throw std::out_of_range("Address out of range");
         }
@@ -101,7 +37,8 @@ public:
     }
 
     // Load binary file into ROM
-    bool LoadFromFile(const std::string& filename) {
+    bool LoadFromFile() {
+        const std::string& filename = "memory.bin";
         std::ifstream file(filename, std::ios::binary | std::ios::ate);
         if (!file.is_open()) {
             std::cerr << "Error: Could not open file " << filename << std::endl;
@@ -112,16 +49,7 @@ public:
         std::streamsize fileSize = file.tellg();
         file.seekg(0, std::ios::beg);
 
-        if (start < start_address || start + fileSize > end_address + 1) {
-            std::cerr << "Error: File size exceeds ROM address space." << std::endl;
-            return false;
-        }
 
-        // Read file content into ROM memory
-        if (!file.read(reinterpret_cast<char*>(&memory[startAddress - start_address]), fileSize)) {
-            std::cerr << "Error: Could not read file into ROM." << std::endl;
-            return false;
-        }
 
         std::cout << "Memory loaded successfully from " << filename << std::endl;
         return true;
@@ -145,14 +73,77 @@ public:
         throw std::runtime_error("Cannot write to ROM");
     }
 
-    // void LoadData(const std::vector<uint8_t>& data) {
-    //     if (data.size() > memory.size()) {
-    //         throw std::runtime_error("Data too large for ROM");
-    //     }
-    //     std::copy(data.begin(), data.end(), memory.begin());
-    // }
+    void LoadData(const std::vector<Byte>& data) {
+        if (data.size() > memory.size()) {
+            throw std::runtime_error("Data too large for ROM");
+        }
+        std::copy(data.begin(), data.end(), memory.begin());
+    }
 };
 
+class UnifiedMemory {
+    RAM ram;       // Example: RAM covering 0x0000 to 0x1FFF
+    ROM rom;       // Example: ROM covering 0xC000 to 0xFFFF
+    // std::unordered_map<Word, Byte> ioRegisters; // Simulated I/O registers
+
+public:
+    UnifiedMemory()
+        : ram(0x0000, 0x3FFF), rom(0x8000, 0xFFFF) {}
+
+    Byte Read(Word address) {
+        if (address <= 0x3FFF) {
+            return ram.Read(address);
+        // } else if (address >= 0x2000 && address <= 0x3FFF) {
+            // I/O Registers
+            // return ioRegisters[address % 8]; // Example: NES-like mirroring
+        } else if (address >= 0x8000) {
+            // ROM
+            return rom.Read(address);
+        } else {
+            throw std::out_of_range("Address not mapped");
+        }
+    }
+
+    void Write(Word address, Byte value) {
+        if (address <= 0x3FFF) {
+            // RAM with mirroring
+            ram.Write(address, value);
+        // } else if (address >= 0x2000 && address <= 0x3FFF) {
+            // I/O Registers
+            // ioRegisters[address % 8] = value;
+        } else if (address >= 0x8000) {
+            // ROM is read-only
+            throw std::runtime_error("Cannot write to ROM");
+        } else {
+            throw std::out_of_range("Address not mapped");
+        }
+    }
+
+    bool LoadROM(const std::string &filename) {
+        std::ifstream file(filename, std::ios::binary | std::ios::ate);
+        if (!file.is_open()) {
+            std::cerr << "Error: Could not open file " << filename << std::endl;
+            return false;
+        }
+
+        std::streamsize fileSize = file.tellg();
+        file.seekg(0, std::ios::beg);
+
+        // if (fileSize > rom.GetSize()) {
+        //     std::cerr << "Error: ROM file is too large" << std::endl;
+        //     return false;
+        // }
+
+        std::vector<Byte> buffer(fileSize);
+        if (file.read(reinterpret_cast<char *>(buffer.data()), fileSize)) {
+            rom.LoadData(buffer);
+            return true;
+        }
+
+        return false;
+    }
+
+};
 
 
 struct CPU
@@ -172,83 +163,69 @@ struct CPU
     Byte V : 1; // overflow flag
     Byte N : 1; // negative flag
 
-    void Reset(Mem &memory)
-    {
+    void Reset(UnifiedMemory &memory) {
         PC = 0xFFFC;
         SP = 0xFF;
 
-        C = 0;
-        Z = 0;
-        I = 0;
-        D = 0;
-        B = 0;
-        V = 0;
-        N = 0;
+        // Reset flags and registers
+        C = Z = I = D = B = V = N = 0;
+        A = X = Y = 0;
 
-        A = 0x00;
-        X = 0x00;
-        Y = 0x00;
-
-        memory.Initialise();
+        // Read the reset vector (stored in ROM at 0xFFFC and 0xFFFD)
+        Byte lowerStartAddress = memory.Read(0xFFFC);
+        Byte upperStartAddress = memory.Read(0xFFFD);
+        PC = (upperStartAddress << 8) | lowerStartAddress;
+    }
 
 
-
-
-        // Do the startup sequence. Now i am just cheating by directly reading where the PC should start
-        Byte lowerStartAddress = memory[0xFFFC];
-        Byte upperStartAddress = memory[0xFFFD];
-        Word startAddress = (upperStartAddress << 8) | lowerStartAddress;
-        PC = startAddress;
-    };
-
-    Word FetchWord(u32& Cycles, Mem& memory)
+    Word FetchWord(u32& Cycles, UnifiedMemory& memory)
     {
         //6502 is little endian
         //First grab the low byte
-        Word Data = memory[PC]; // It doesnt matter that memory[] only gives a byte
+        Word Data = memory.Read(PC); // It doesnt matter that memory[] only gives a byte
         PC++;
         Cycles--;
         // Next we grab the high byte. To combine, we use the OR operator
-        Data |= (memory[PC] << 8);
+        Data |= (memory.Read(PC) << 8);
         PC++;
         Cycles--;
         return Data;
     }
 
-    Byte FetchByte(u32& Cycles, Mem& memory) // 1 cycle
+    Byte FetchByte(u32& Cycles, UnifiedMemory& memory) // 1 cycle
     {
-        Byte Data = memory[PC];
+        Byte Data = memory.Read(PC);
         PC++;
         Cycles--;
         return Data;
     }
 
-    Byte ReadByte (u32& Cycles, Mem& memory, Word address) // Read one Byte from memory at address. This consumes 1 cycle
+    Byte ReadByte (u32& Cycles, UnifiedMemory& memory, Word address) // Read one Byte from memory at address. This consumes 1 cycle
     {
         // The PC is not used to read a byte.
-        Byte Data = memory[address];
+        Byte Data = memory.Read(address);
         Cycles--;
         return Data;
     }
 
-    void StoreByte(u32& Cycles, Mem& memory, Byte value, Word address)
+    void StoreByte(u32& Cycles, UnifiedMemory& memory, Byte value, Word address)
     {
-        memory[address] = value; // This takes a lot of C++ syntax to actually make happen
+        memory.Write(address ,value); // This takes a lot of C++ syntax to actually make happen
         Cycles--; // This operation takes 1 cycle
     }
 
-    void pushBytetoStack(Byte data,u32& Cycles, Mem& memory)
+    void pushBytetoStack(Byte data,u32& Cycles, UnifiedMemory& memory)
     {
         // Assert that the stack pointer is not at it's maximum of 0x01FF
-        memory[SP | 0x0100] = data;
+        memory.Write(SP | 0x0100, data);
         SP--;
         Cycles--;
     }
 
-    Byte pullBytefromStack(u32& Cycles, Mem& memory)
+    Byte pullBytefromStack(u32& Cycles, UnifiedMemory& memory)
     {
         SP++;
-        Byte data = memory[SP | 0x0100];
+        Byte data = memory.Read(SP | 0x0100);
         Cycles--;
         return data;
     }
@@ -347,7 +324,7 @@ struct CPU
 
 
 
-    void Execute(u32 Cycles, Mem & memory) // Cycles: for how many clockcycles do we want to execute?
+    void Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clockcycles do we want to execute?
     {
         const u32 STARTCYCLES = Cycles;
         while ((Cycles > 0) && (Cycles<= STARTCYCLES))
@@ -505,39 +482,41 @@ struct CPU
 
     }
 
-    void store_output_file(Mem & memory)
+    void store_output_file(UnifiedMemory & memory)
     {
         std::ofstream outputFile("output.bin", std::ios::binary); // open a binary file. This is something we can write to
         // check if the file was succesfully opened. Idk why this is neccesary
         if (!outputFile) { std::cerr << "Error opening file!" << std::endl; return;}
-        // write the stuff
-        outputFile.write(reinterpret_cast<const char*> (&memory[0x6000]), 0x1000);
-        outputFile.close();
-        return;
+        // Write the memory contents from 0x6000 to 0x6FFF to the file
+        for (Word address = 0x6000; address <= 0x6FFF; ++address) {
+            Byte data = memory.Read(address);
+            outputFile.write(reinterpret_cast<char*>(&data), sizeof(Byte));
+        }
+    std::cout << "Output file stored successfully." << std::endl;
     }
 };
 
 
+int main() {
+    // Initialize UnifiedMemory which combines ROM, RAM, and I/O
+    UnifiedMemory memory;
 
-int main()
-{
-    ROM rom(0x8000,0xffff);
-    RAM ram(0x0000,0x3fff);
-    CPU cpu;
-    cpu.Reset(rom);
-    cpu.Reset(ram);
-
-        // Initialize ROM with memory.bin
-    if (!rom.LoadFromFile("memory.bin")) {
+    // Load the ROM into memory
+    if (!memory.LoadROM("memory.bin")) {
         std::cerr << "Failed to load ROM data. Exiting." << std::endl;
         return 1;
     }
 
-    cpu.Execute(500, rom); // dit moet op dit moment het precieze aantal clock cycles weten van tevoren.
-    
-    // In this CPU, memory address 0x6000-0x6FFF is reserved for output.
-    cpu.store_output_file(rom);
-    
-    return 0;
+    // Initialize the CPU and reset it
+    CPU cpu;
+    cpu.Reset(memory);
 
-}
+    // Execute a certain number of clock cycles
+    int cycles = 500;  // Adjust the number of cycles to simulate
+    cpu.Execute(cycles, memory); // You can modify Execute() to accept memory
+
+    // Store the output in a file from memory region 0x6000-0x6FFF
+    cpu.store_output_file(memory);
+
+    return 0;
+};

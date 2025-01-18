@@ -31,7 +31,7 @@ step2:
 
 
 store_val:
-    sta $6000,X
+    sta $3000,X
     inx ;increment X
     rts
 
