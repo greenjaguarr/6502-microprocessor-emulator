@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "memory.h"
+#include "cpu2.h"
 
 // http://www.obelisk.me.uk/6502/
 // https://www.youtube.com/watch?v=qJgsuQoy9bc
@@ -17,39 +18,23 @@ using Word = unsigned short;
 
 #define DEBUG false
 
-struct CPU
-{
-    
-    Word PC; //program counter
-    Byte SP; //stack pointer. Even though memory is the size of a word, the first to hexadecimals of the SP are always 00, so it can be stored in only a singe byte.
 
-    Byte A,X,Y; // registers
+void CPU::Reset(UnifiedMemory &memory) {
+    PC = 0xFFFC;
+    SP = 0xFF;
 
-    // Processor status
-    Byte C : 1; // carry flag
-    Byte Z : 1; // zero flag
-    Byte I : 1; // interrupt disable
-    Byte D : 1; // decimal mode
-    Byte B : 1; // break command
-    Byte V : 1; // overflow flag
-    Byte N : 1; // negative flag
+    // Reset flags and registers
+    C = Z = I = D = B = V = N = 0;
+    A = X = Y = 0;
 
-    void Reset(UnifiedMemory &memory) {
-        PC = 0xFFFC;
-        SP = 0xFF;
-
-        // Reset flags and registers
-        C = Z = I = D = B = V = N = 0;
-        A = X = Y = 0;
-
-        // Read the reset vector (stored in ROM at 0xFFFC and 0xFFFD)
-        Byte lowerStartAddress = memory.Read(0xFFFC);
-        Byte upperStartAddress = memory.Read(0xFFFD);
-        PC = (upperStartAddress << 8) | lowerStartAddress;
-    }
+    // Read the reset vector (stored in ROM at 0xFFFC and 0xFFFD)
+    Byte lowerStartAddress = memory.Read(0xFFFC);
+    Byte upperStartAddress = memory.Read(0xFFFD);
+    PC = (upperStartAddress << 8) | lowerStartAddress;
+}
 
 
-    Word FetchWord(u32& Cycles, UnifiedMemory& memory)
+Word CPU::FetchWord(u32& Cycles, UnifiedMemory& memory)
     {
         //6502 is little endian
         //First grab the low byte
@@ -63,7 +48,7 @@ struct CPU
         return Data;
     }
 
-    Byte FetchByte(u32& Cycles, UnifiedMemory& memory) // 1 cycle
+Byte CPU::FetchByte(u32& Cycles, UnifiedMemory& memory) // 1 cycle
     {
         Byte Data = memory.Read(PC);
         PC++;
@@ -71,7 +56,7 @@ struct CPU
         return Data;
     }
 
-    Byte ReadByte (u32& Cycles, UnifiedMemory& memory, Word address) // Read one Byte from memory at address. This consumes 1 cycle
+Byte CPU::ReadByte (u32& Cycles, UnifiedMemory& memory, Word address) // Read one Byte from memory at address. This consumes 1 cycle
     {
         // The PC is not used to read a byte.
         Byte Data = memory.Read(address);
@@ -79,7 +64,7 @@ struct CPU
         return Data;
     }
 
-    void StoreByte(u32& Cycles, UnifiedMemory& memory, Byte value, Word address)
+void CPU::StoreByte(u32& Cycles, UnifiedMemory& memory, Byte value, Word address)
     {
         memory.Write(address ,value); // This takes a lot of C++ syntax to actually make happen
         Cycles--; // This operation takes 1 cycle
@@ -88,7 +73,7 @@ struct CPU
         }
     }
 
-    void pushBytetoStack(Byte data,u32& Cycles, UnifiedMemory& memory)
+void CPU::pushBytetoStack(Byte data,u32& Cycles, UnifiedMemory& memory)
     {
         // Assert that the stack pointer is not at it's maximum of 0x01FF
         memory.Write(SP | 0x0100, data);
@@ -96,7 +81,7 @@ struct CPU
         Cycles--;
     }
 
-    Byte pullBytefromStack(u32& Cycles, UnifiedMemory& memory)
+Byte CPU::pullBytefromStack(u32& Cycles, UnifiedMemory& memory)
     {
         SP++;
         Byte data = memory.Read(SP | 0x0100);
@@ -104,13 +89,13 @@ struct CPU
         return data;
     }
 
-    void SetPC_absolute (u32& Cycles, Word Address)
+void CPU::SetPC_absolute (u32& Cycles, Word Address)
     {
         PC = Address; // may or may not have to be + or - 1
         Cycles--; // Setting the program counter takes one clock cycle
     }
 
-    void SetPC_relative(u32 & Cycles, Byte offset) // offset is signed TODO
+void CPU::SetPC_relative(u32 & Cycles, Byte offset) // offset is signed TODO
     {
         Word previous_PC = PC;
         // offset is signed. compensate for this
@@ -138,7 +123,7 @@ struct CPU
         // PC--; // compensate for that the PC has to run ( idk what this means when i wrote it)
     }
 
-    void SetStatusNZbasedonA()
+void CPU::SetStatusNZbasedonA()
     {
         // set zero flag if neccesary
         Z = ((A==0x00) ? true : false);
@@ -146,7 +131,7 @@ struct CPU
         N = (((A & 0x80) == 0x80) ? true : false);
     }
 
-    void SetStatusNZbasedonX()
+void CPU::SetStatusNZbasedonX()
     {
         // set zero flag if neccesary
         Z = ((X==0x00) ? true : false);
@@ -154,7 +139,7 @@ struct CPU
         N = (((X & 0x80) == 0x80) ? true : false);
     }
 
-    void ADC(Byte operand) // This happens internally and takes NO cycles
+void CPU::ADC(Byte operand) // This happens internally and takes NO cycles
     {
         Word sum = A + operand + C; // We need a Word to hold the sum in order to process the overflow
         C = (sum > 0xFF ) ? 1 : 0; // Check for overflow
@@ -168,7 +153,7 @@ struct CPU
         A = result; // Store the result in the A register
     }
 
-    void AND(Byte operand) // This happens internally and takes NO cycles
+void CPU::AND(Byte operand) // This happens internally and takes NO cycles
     {
         Byte result = A & operand; // bitwise AND
         A = result;
@@ -177,28 +162,7 @@ struct CPU
     }
 //http://www.6502.org/tutorials/6502opcodes.html
 
-    static constexpr Byte INS_LDA_IM = 0xA9; // instruction load A immediate                2 bytes 2 cycles
-    static constexpr Byte INS_LDA_ZP = 0xA5; // instruction load A from zero page.          2 bytes 3 cycles
-    static constexpr Byte INS_JMP_ABS = 0x4C; //Jump to absolute address.                   3 bytes 3 cycles
-    static constexpr Byte INS_JSR = 0x20; // Jump to SubRoutine.                            3 bytes 6 cycles
-    static constexpr Byte INS_NOP = 0xEA; // The no-op instruction                          1 byte 1 cycle
-    static constexpr Byte INS_ADC_IM = 0x69; // add with carry immediate.                   2 bytes 2 cycles 
-    static constexpr Byte INS_ADC_ABS = 0x6D; // add with carry absolute address.           3 bytes 4 cycles 
-    static constexpr Byte INS_AND_IM = 0x29; // AND the value of A with an immediate value. 2 bytes 2 cycles
-    static constexpr Byte INS_AND_ABS = 0x2D; // AND A with the value in the address        3 bytes 4 cycles
-    static constexpr Byte INS_ASL_A = 0x0A; // arithmatic shift left. bit0=0, C=bit7        1 byte  2 cycles
-    static constexpr Byte INS_STA_ABS = 0x8D; // store A intoRAM(TODOmakeonlytop8Kwritable) 3 bytes 4 cycles
-    static constexpr Byte INS_RTS = 0x60; // return from subroutine. load PC from stack.    1 byte  6 cycles
-    static constexpr Byte INS_LSR_A = 0x4A; // logical shift right. bit7=0 C=bit0           1 byte  2 cycles
-    static constexpr Byte INS_STA_ABSX = 0x9D; //sta a address abs + the value in the x reg 3 bytes 5 cycles
-    static constexpr Byte INS_LDX_IM = 0xA2; // load X with immediate value. loops?         2 bytes 2 cycles
-    static constexpr Byte INS_INX = 0xE8; // increment X register                           1 btye  2 cycles
-    static constexpr Byte INS_LDA_ABS = 0xAD; // load A abs                                 3 bytes 4 cycles
-    static constexpr Byte INS_BVS = 0x70; // branch if overflow is set                      2 bytes weird amount of cycles
-
-
-
-    void Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clockcycles do we want to execute?
+void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clockcycles do we want to execute?
     {
         const u32 STARTCYCLES = Cycles;
         while ((Cycles > 0) && (Cycles<= STARTCYCLES))
@@ -358,7 +322,7 @@ struct CPU
 
     }
 
-    void store_output_file(const std::string& filename, uint16_t start, uint16_t end, UnifiedMemory& memory)
+void CPU::store_output_file(const std::string& filename, uint16_t start, uint16_t end, UnifiedMemory& memory)
     {
         std::ofstream outputFile(filename, std::ios::binary); // open a binary file. This is something we can write to
         // check if the file was succesfully opened. Idk why this is neccesary
@@ -370,4 +334,3 @@ struct CPU
         }
     std::cout << "Output file stored successfully." << std::endl;
     }
-};

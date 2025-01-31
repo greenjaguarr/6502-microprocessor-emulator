@@ -15,7 +15,7 @@ int main() {
     UnifiedMemory memory;
 
     // Load the ROM into memory
-    if (!memory.LoadROM("memory.bin")) {
+    if (!memory.LoadFromFile("memory.bin")) {
         std::cerr << "Failed to load ROM data. Exiting." << std::endl;
         return 1;
     }
@@ -29,7 +29,7 @@ int main() {
     cpu.Execute(cycles, memory); // You can modify Execute() to accept memory
 
     // Store the output in a file from memory region 0x6000-0x6FFF
-    cpu.store_output_file("output.bin", 0x2000, 0x3fff);
+    cpu.store_output_file("output.bin", 0x2000, 0x3fff, memory);
 
     return 0;
 };

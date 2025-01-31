@@ -44,7 +44,7 @@ public:
     UnifiedMemory();
     Byte Read(Word address);
     void Write(Word address, Byte value);
-    bool LoadROM(const std::string &filename);
+    bool LoadFromFile(const std::string &filename);
 };
 
 #endif // MEMORY_H

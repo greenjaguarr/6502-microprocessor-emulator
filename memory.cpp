@@ -121,8 +121,8 @@ public:
         }
     }
 
-    bool LoadFromFile() {
-        const std::string filename = "memory.bin";
+    bool LoadFromFile(const std::string &filename) {
+        // const std::string filename = "memory.bin";
         std::ifstream file(filename, std::ios::binary | std::ios::ate);
         if (!file.is_open()) {
             std::cerr << "Error: Could not open file " << filename << std::endl;
