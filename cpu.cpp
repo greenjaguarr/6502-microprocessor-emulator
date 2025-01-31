@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "memory.h"
-#include "cpu2.h"
+#include "cpu.h"
 
 // http://www.obelisk.me.uk/6502/
 // https://www.youtube.com/watch?v=qJgsuQoy9bc

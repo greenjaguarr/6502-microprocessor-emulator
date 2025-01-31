@@ -12,3 +12,10 @@ januari 2025
 g++ -o main main_6502.cpp && ./main
 vasm6502_oldstyle -Fbin -dotdir -o memory.bin asm_files/fibonachi_numbers.s
 hexdump -C output.bin
+
+31-1-2025
+first use
+vasm6502_oldstyle -o memory.bin <asm_files/assembly file>
+to make the memory.
+Next you can use ./run to compile and run the entire thing
+use hexdump -C output.bin to see the result
