@@ -22,7 +22,7 @@ using Word = unsigned short;
 // std::vector<Byte> memory;
 // Word start_address, end_address;
 // public:
-Mem::Mem(Word start, Word end) 
+Mem::Mem(Word start, Word end)  // abstract base class for RAM and ROM
         : start_address(start), end_address(end), memory(end - start + 1, 0) {}
 
 Byte Mem::Read(Word address) {

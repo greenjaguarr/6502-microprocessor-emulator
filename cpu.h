@@ -15,12 +15,12 @@ public:
     void store_output_file(const std::string& filename, uint16_t start, uint16_t end, UnifiedMemory& memory);
 
 private:
-    uint8_t memory[65536]; // 64KB memory space
-    uint16_t PC = 0;  // Program Counter
-    uint8_t A = 0, X=0, Y=0; // Registers
+    // Byte memory[65536]; // 64KB memory space
+    Word PC = 0;  // Program Counter
+    Byte A = 0, X=0, Y=0; // Registers
     // uint8_t status; // Status register
     bool C=false, Z=false, I=false, D=false, B=false, V=false, N=false; // Flags
-    uint8_t SP; // Stack Pointer
+    Byte SP; // Stack Pointer
 
     Byte FetchByte(u32& cycles, UnifiedMemory& memory);
     Word FetchWord(u32& cycles, UnifiedMemory& memory);
@@ -34,6 +34,11 @@ private:
     void SetStatusNZbasedonX();
     void ADC(Byte operand);
     void AND(Byte operand);
+    void CMP(Byte operand);
+    void SBC(Byte operand);
+
+    Byte AM_IM(u32 Cycles, UnifiedMemory& memory); // addressing mode: immediate
+    Byte AM_ABS(u32 Cycles, UnifiedMemory& memory);
 
     static constexpr Byte INS_LDA_IM = 0xA9;
     static constexpr Byte INS_LDA_ZP = 0xA5;
@@ -53,6 +58,10 @@ private:
     static constexpr Byte INS_INX = 0xE8;
     static constexpr Byte INS_LDA_ABS = 0xAD;
     static constexpr Byte INS_BVS = 0x70;
+    static constexpr Byte INS_CMP_IM = 0xC9;
+    static constexpr Byte INS_CMP_ABS = 0xCD;
+    static constexpr Byte INS_SBC_IM = 0xE9;
+    static constexpr Byte INS_SBC_ABS = 0xED;
 };
 
 #endif // CPU_H

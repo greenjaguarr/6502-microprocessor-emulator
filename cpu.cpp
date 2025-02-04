@@ -141,12 +141,12 @@ void CPU::SetStatusNZbasedonX()
 
 void CPU::ADC(Byte operand) // This happens internally and takes NO cycles
     {
-        Word sum = A + operand + C; // We need a Word to hold the sum in order to process the overflow
+        Word sum = (Word)A + (Word)operand + C; // We need a Word to hold the sum in order to process the overflow
         C = (sum > 0xFF ) ? 1 : 0; // Check for overflow
-        Byte result = sum& 0xFF; // Cast the result back to a Byte / uint_8
+        Byte result = (Byte)sum; // Cast the result back to a Byte / uint_8
         Z = ( result == 0 ) ? 1 : 0; // Check for the zero flag
-        N = ( result & 0x80 ) ? 1 : 0; // Check for the negative flag ( aka the leading bit is set)
-        V = ((A ^ result ) & ( operand & result ) & 0x80 ) ? 1 : 0;
+        N = ( result & 0b10000000 ) ? 1 : 0; // Check for the negative flag ( aka the leading bit is set)
+        V = ((A ^ result ) & ( operand & result ) & 0x80 ) ? 1 : 0; 
         /* Set oVerflow flag (check for signed overflow)
         Overflow happens when the sign of A and the operand are the same, but the sign of the result is different
         idk how it works with adding including the Carry bit*/
@@ -160,7 +160,38 @@ void CPU::AND(Byte operand) // This happens internally and takes NO cycles
         N = (A & 0x80) ? 1 : 0;
         Z = (A == 0) ? 1 : 0;
     }
+
+void CPU::CMP(Byte operand){
+    Word temp = A - operand;
+    C = (A >= operand) ? 1 : 0;
+    Z = (temp == 0) ? 1 : 0;
+    N = (temp & 0x80) ? 1 : 0;
+}
+void CPU::SBC(Byte operand){
+    Word temp = A - operand - (1 - C);
+    C = (temp < 0x100) ? 1 : 0;                            // Carry is set if no borrow occurs
+    Z = ((temp & 0xFF) == 0) ? 1 : 0;
+    N = (temp & 0x80) ? 1 : 0;
+    V = ((A ^ temp) & (A ^ operand) & 0x80) ? 1 : 0;
+    A = temp & 0xFF;
+}
+
 //http://www.6502.org/tutorials/6502opcodes.html
+
+Byte CPU::AM_IM(u32 Cycles, UnifiedMemory& memory) // addressing mode: immediate
+    {
+        // takes one cycle. adds one to the program counter
+        Byte operand = FetchByte(Cycles, memory); // fetch the operand
+        return operand;
+    }
+
+Byte CPU::AM_ABS(u32 Cycles, UnifiedMemory& memory) // you need to provide the address where the operand is
+{
+    // advances pc by 2. takes 3 cycles
+    Word address = FetchWord(Cycles, memory); // it takes 2 cycles to fetch a Word;
+    Byte operand = ReadByte(Cycles, memory, address); // it takes 1 cycle to fetch the Byte
+}
+
 
 void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clockcycles do we want to execute?
     {
@@ -179,24 +210,22 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
             {
                 case INS_ADC_IM:
                 {
-                    Byte operand = FetchByte(Cycles, memory); // consumes 1 cycle/ The first cycle was consumed by fetching hte instruction
+                    Byte operand = AM_IM(Cycles, memory); // fetch the operand
                     ADC(operand);
                 }break;
                 case INS_ADC_ABS:
                 {
-                    Word Address = FetchWord(Cycles, memory); // it takes 2 cycles to fetch a Word;
-                    Byte operand = ReadByte(Cycles, memory, Address); // it takes 1 cycle to fetch the Byte
+                    Byte operand = AM_ABS(Cycles, memory);
                     ADC(operand); // extracted function. it adds and sets the flags
                 }break;
                 case INS_AND_IM:
                 {
-                    Byte operand = FetchByte(Cycles, memory); // 1 cycle
+                    Byte operand = AM_IM(Cycles, memory);
                     AND(operand); // do the AND stuff
                 }break;
                 case INS_AND_ABS:
                 {
-                    Word address = FetchWord(Cycles, memory); // 2 cycles
-                    Byte operand = ReadByte(Cycles, memory, address); // 1 cycle
+                    Byte operand = AM_ABS(Cycles, memory);
                     AND(operand);
                 }break;
                 case INS_ASL_A:
@@ -205,7 +234,16 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
                     A =  A << 1; // shift left 1
                     Cycles--; // this costs 1 cycle
                     SetStatusNZbasedonA();
-                    
+                }break;
+                case INS_CMP_IM:
+                {
+                    Byte operand = AM_IM(Cycles, memory);
+                    CMP(operand);
+                }break;
+                case INS_CMP_ABS:
+                {
+                    Byte operand = AM_ABS(Cycles, memory);
+                    CMP(operand);
                 }break;
                 case INS_INX:
                 {
@@ -235,29 +273,28 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
                 }break;
                 case INS_LDA_IM: // load A immediate
                 {
-                    Byte operand = FetchByte (Cycles, memory);
+                    Byte operand = AM_IM(Cycles, memory);
                     // store value in A register
                     A = operand;
                     SetStatusNZbasedonA();
                 }break;
                 case INS_LDA_ZP: // load A from zero page
                 {
-                    Byte operand = FetchByte (Cycles, memory); // operand indicates where in the zero page, the value is located
-                    Word address = 0x0000 | operand;  //yt vid doet dit niet????
-                    Byte value = ReadByte(Cycles, memory, address);
-                    A = value;
+                    Byte lower_address = FetchByte (Cycles, memory); // operand indicates where in the zero page, the value is located
+                    Word address = 0x0000 | (Word)lower_address;  //yt vid doet dit niet????
+                    Byte operand = ReadByte(Cycles, memory, address);
+                    A = operand;
                     SetStatusNZbasedonA();
                 }break;
                 case INS_LDA_ABS:
                 {
-                    Word Address = FetchWord(Cycles, memory); // Fetch the address where the value is located. 2 cycles
-                    Byte value = ReadByte(Cycles, memory, Address); // 1 cycle
-                    A = value;
+                    Byte operand = AM_ABS(Cycles, memory);
+                    A = operand;
                     SetStatusNZbasedonA();
                 }break;
                 case INS_LDX_IM:
                 {
-                    Byte operand = FetchByte (Cycles, memory);
+                    Byte operand = AM_IM(Cycles, memory);
                     // store value in X register
                     X = operand;
                     SetStatusNZbasedonX();
@@ -267,23 +304,32 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
                     // This means to do nothing
                     // The PC is already incremented by reading the NOP instruction and the reading already consumes a cycle
                 }break;
+                case INS_SBC_IM:
+                {
+                    Byte operand = AM_IM(Cycles, memory);
+                    SBC(operand);
+                }break;
+                case INS_SBC_ABS:
+                {
+                    Byte operand = AM_ABS(Cycles, memory);
+                    SBC(operand);
+                }
                 case INS_STA_ABS:
                 {
+                    // the addressing mode is absolute? but the operand is an address. so dont use AM_ABS
                     Word address = FetchWord(Cycles,memory); // 2 cycles
                     StoreByte(Cycles,memory, A, address); // 1 cycle. Store into RAM
-                    // TODO make only RAM = 0x0000-0x7FFF writable
-                    // ROM = 0x8000-0xFFFF is read-only
 
                 }break;
                 case INS_STA_ABSX:
                 {
                     Word base_address = FetchWord(Cycles,memory); // 2 cycles
-                    Word Address = base_address + X; // add value of the X register to the address
+                    Word address = base_address + X; // add value of the X register to the address
                     Cycles--; // this adding of X takes 1-2 cycles depending on wether or not the address crosses into another page
                     Byte basepage = base_address >> 8;
-                    Byte resultpage = Address >> 8;
+                    Byte resultpage = address >> 8;
                     if (basepage != resultpage){Cycles--;} // check for the crossing of the page
-                    StoreByte(Cycles, memory, A, Address); // store A in the address.
+                    StoreByte(Cycles, memory, A, address); // store A in the address.
 
                 }break;
                 case INS_RTS:
@@ -317,6 +363,7 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
                 printf("Instruction not handled %d", Instruction);
             }
                 break; // The instruction was not found. Make the cpu crash
+                
             }
         }
 

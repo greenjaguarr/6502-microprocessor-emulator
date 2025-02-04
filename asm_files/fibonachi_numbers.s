@@ -12,7 +12,7 @@
 ; loop
 step1:
     lda $0200
-    adc $0201
+    adc $0201 ; add with carry
     bvs loop ; branch if overflow set to loop, where the program is halted
     sta $0200
     jsr store_val
@@ -29,9 +29,9 @@ step2:
     jmp step1
 
 
-
+; store the value in the A register into memory
 store_val:
-    sta $3000,X
+    sta $3000,X ; address = 3000 + X
     inx ;increment X
     rts
 
@@ -40,5 +40,5 @@ loop:
     jmp loop
 
     .org $FFFC
-    .word $8000
+    .word $8000 ; reset vector 00 in address FFFC and 80 in address FFFD
     .word $0000
