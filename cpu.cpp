@@ -16,7 +16,7 @@ using u32 = unsigned int;
 using Byte = unsigned char;
 using Word = unsigned short;
 
-#define DEBUG true
+#define DEBUG false
 
 
 void CPU::Reset(UnifiedMemory &memory) {
@@ -173,7 +173,10 @@ void CPU::SBC(Byte operand){
     V = ((A ^ temp) & (A ^ operand) & 0x80) ? 1 : 0;
     A = temp & 0xFF;
 }
-
+void CPU::LDA(Byte operand){
+    A = operand;
+    SetStatusNZbasedonA();
+}
 //http://www.6502.org/tutorials/6502opcodes.html
 
 // Addressing Mode funcs
@@ -192,6 +195,19 @@ Byte CPU::AM_ABS_LOAD(u32 Cycles, UnifiedMemory& memory) // you need to provide 
     Byte operand = ReadByte(Cycles, memory, address); // it takes 1 cycle to fetch the Byte
     return operand;
 }
+Byte CPU::AM_ABSY_LOAD(u32 Cycles, UnifiedMemory& memory)
+{
+    // takes 3-4 cycles
+    Word base_address = FetchWord(Cycles, memory); // 2 cycles
+    Word address = base_address + Y; // add value of the Y register to the address
+    Cycles--; // this adding of Y takes 1-2 cycles depending on wether or not the address crosses into another page
+
+    // Byte basepage = base_address >> 8;
+    // Byte resultpage = address >> 8;
+    // if (basepage != resultpage){Cycles--;} // check for the crossing of the page
+
+    return address;
+}
 
 Word CPU::AM_ABSY_STORE(u32 Cycles, UnifiedMemory& memory)
 {
@@ -209,7 +225,13 @@ Word CPU::AM_ABSY_STORE(u32 Cycles, UnifiedMemory& memory)
 
     return address;
 }
-
+Word CPU::AM_ZP_STORE(u32 Cycles, UnifiedMemory& memory)
+{
+    // takes 1 cycles
+    Byte lower_address = FetchByte(Cycles, memory); // operand indicates where in the zero page, the value is located
+    Word address = 0x0000 | (Word)lower_address;
+    return address;
+}
 
 // this is where the magic happens
 void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clockcycles do we want to execute?
@@ -288,6 +310,14 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
                         SetPC_relative(Cycles, offset); // 1 cycle always + 1 cycle if PAGE is crossed
                     }
                 }break;
+                case INS_BCC:
+                {
+                    Byte offset = FetchByte(Cycles, memory); // 1 cycle
+                    if (C == 0)
+                    {
+                        SetPC_relative(Cycles, offset); // 1 cycle always + 1 cycle if PAGE is crossed
+                    }
+                }break;
                 case INS_CMP_IM:
                 {
                     Byte operand = AM_IM_LOAD(Cycles, memory);
@@ -327,23 +357,25 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
                 {
                     Byte operand = AM_IM_LOAD(Cycles, memory);
                     // store value in A register
-                    A = operand;
-                    SetStatusNZbasedonA();
+                    LDA(operand);
                 }break;
                 case INS_LDA_ZP: // load A from zero page
                 {
                     Byte lower_address = FetchByte (Cycles, memory); // operand indicates where in the zero page, the value is located
                     Word address = 0x0000 | (Word)lower_address;  //yt vid doet dit niet????
                     Byte operand = ReadByte(Cycles, memory, address);
-                    A = operand;
-                    SetStatusNZbasedonA();
+                    LDA(operand);
                 }break;
                 case INS_LDA_ABS:
                 {
                     Byte operand = AM_ABS_LOAD(Cycles, memory);
-                    A = operand;
-                    SetStatusNZbasedonA();
+                    LDA(operand);
                 }break;
+                case INS_LDA_ABSY:
+                {
+                    Byte operand = AM_ABSY_LOAD(Cycles, memory);
+                    LDA(operand);
+                } break;
                 case INS_LDX_IM:
                 {
                     Byte operand = AM_IM_LOAD(Cycles, memory);
@@ -465,6 +497,21 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
                     X = A; // transfer A to X
                     Cycles--; // this takes 1 cycle
                     SetStatusNZbasedonX();
+                }break;
+                case INS_STA_ZP:
+                {
+                    Word address = AM_ZP_STORE(Cycles, memory); // takes 1 cycle
+                    StoreByte(Cycles, memory, A, address); // 1 cycle
+                }break;
+                case INS_STX_ZP:
+                {
+                    Word address = AM_ZP_STORE(Cycles, memory);
+                    StoreByte(Cycles, memory, X, address);
+                }break;
+                case INS_STY_ZP:
+                {
+                    Word address = AM_ZP_STORE(Cycles, memory);
+                    StoreByte(Cycles, memory, Y, address);
                 }break;
 
                 default:

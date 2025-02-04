@@ -51,7 +51,7 @@ NEXTCHAR:
                 BEQ     NEXTCHAR       ; Loop until ready.
                 LDA     ACIA_DATA      ; Load character. B7 will be '0'.
                 STA     IN,Y           ; Add to text buffer.
-                JSR     ECHO           ; Display character.
+;                JSR     ECHO           ; Display character.
 ;                CMP     #$0D           ; CR?
                 CMP     #$70           ; "p"? (for proceed)
                 BNE     NOTCR          ; No.
@@ -68,7 +68,8 @@ BLSKIP:
                 INY                    ; Advance text index.
 NEXTITEM:
                 LDA     IN,Y           ; Get character.
-                CMP     #$0D           ; CR?
+;                CMP     #$0D           ; CR?
+                CMP     #$70           ; "p"? (for proceed)
                 BEQ     GETLINE        ; Yes, done this line.
                 CMP     #$2E           ; "."?
                 BCC     BLSKIP         ; Skip delimiter.
@@ -134,7 +135,7 @@ SETADR:         LDA     L-1,X          ; Copy hex data to
 
 NXTPRNT:
                 BNE     PRDATA         ; NE means no address to print.
-                LDA     #$0D           ; CR.
+                LDA     #$0D           ; CR. ; for printing we do want to see CR
                 JSR     ECHO           ; Output it.
                 LDA     XAMH           ; 'Examine index' high-order byte.
                 JSR     PRBYTE         ; Output it in hex format.

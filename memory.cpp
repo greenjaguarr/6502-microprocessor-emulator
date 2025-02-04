@@ -14,7 +14,7 @@ using u32 = unsigned int;
 using Byte = unsigned char;
 using Word = unsigned short;
 
-#define DEBUG true
+#define DEBUG false
 
 
 // class Mem {
@@ -85,7 +85,9 @@ Byte ExternalRegister::Read() {
     char input;
     std::cin >> input;  // Read a single character
     value = static_cast<Byte>(input);  // Store it as a Byte (unsigned char) // idk about this static cast thing
-    std::cout << "\n Just read the character " << value << std::endl;
+    if (DEBUG) {
+        printf("Just read the character %c\n", value);
+    }
     return value;
 }
 void ExternalRegister::Write(Byte newValue) {
