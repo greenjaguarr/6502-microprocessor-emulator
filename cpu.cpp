@@ -16,7 +16,7 @@ using u32 = unsigned int;
 using Byte = unsigned char;
 using Word = unsigned short;
 
-#define DEBUG false
+#define DEBUG true
 
 
 void CPU::Reset(UnifiedMemory &memory) {
@@ -66,7 +66,7 @@ Byte CPU::ReadByte (u32& Cycles, UnifiedMemory& memory, Word address) // Read on
 
 void CPU::StoreByte(u32& Cycles, UnifiedMemory& memory, Byte value, Word address)
     {
-        memory.Write(address ,value); // This takes a lot of C++ syntax to actually make happen
+        memory.Write(address ,value);
         Cycles--; // This operation takes 1 cycle
         if (DEBUG){
             std::cout << "[DEBUG] Wrote Byte to " << std::hex << address << " value " << std::dec << (int)value << std::endl;
@@ -77,51 +77,39 @@ void CPU::pushBytetoStack(Byte data,u32& Cycles, UnifiedMemory& memory)
     {
         // Assert that the stack pointer is not at it's maximum of 0x01FF
         memory.Write(SP | 0x0100, data);
-        SP--;
+        SP--; // the stack pointer always points to the next free space
         Cycles--;
     }
 
 Byte CPU::pullBytefromStack(u32& Cycles, UnifiedMemory& memory)
     {
-        SP++;
+        SP++; // the stack pointer always points to the next free space
         Byte data = memory.Read(SP | 0x0100);
         Cycles--;
         return data;
     }
 
-void CPU::SetPC_absolute (u32& Cycles, Word Address)
+void CPU::SetPC_absolute(u32& Cycles, Word address)
     {
-        PC = Address; // may or may not have to be + or - 1
+        PC = address; // may or may not have to be + or - 1
         Cycles--; // Setting the program counter takes one clock cycle
     }
 
-void CPU::SetPC_relative(u32 & Cycles, Byte offset) // offset is signed TODO
-    {
-        Word previous_PC = PC;
-        // offset is signed. compensate for this
-        bool signBit = (offset >= 0x80); // check for the sign bit = -128 place
-        if (signBit)
-        {
-            offset = offset && 0x7F; // remove the first bit
-            PC += offset; // add the offset to theprogram counter
-            PC -= 0x80; // subtract 128 from the program counter for the sign bit
-            Cycles--;
-        } else{
-            PC += offset; // add value of the offset to jmp around in the program
-            Cycles--;
-        }
-        // offset = offset - 0x80;} // remove the leading bit
-        // PC += offset; // add the offset first
-        // Cycles--; // this takes one cycle
-        // if (signBit == true ) { // 2nd add the sign. This is in the same cycle as step 1
-        //     PC-=128;
-        // }
-        // check for if a PAGE boundy is crossed
-        if ((previous_PC >> 8 ) != (PC >> 8)){
-            Cycles--;
-        }
-        // PC--; // compensate for that the PC has to run ( idk what this means when i wrote it)
+void CPU::SetPC_relative(u32 & Cycles, Byte offset) { // takes 1 or 2 cycles
+    Word previous_PC = PC;
+
+    int8_t signed_offset = static_cast<int8_t>(offset); // Correct sign extension
+    PC += signed_offset; // Add signed offset directly
+    Cycles--; // Always consume 1 cycle
+
+    // Check if a page boundary is crossed
+    if ((previous_PC & 0xFF00) != (PC & 0xFF00)) {
+        Cycles--; // Additional cycle if crossing a page
     }
+}
+
+
+// extract repeat code
 
 void CPU::SetStatusNZbasedonA()
     {
@@ -138,6 +126,16 @@ void CPU::SetStatusNZbasedonX()
         // set negative flag if neccesary
         N = (((X & 0x80) == 0x80) ? true : false);
     }
+
+void CPU::SetStatusNZbasedonY()
+    {
+        // set zero flag if neccesary
+        Z = ((Y==0x00) ? true : false);
+        // set negative flag if neccesary
+        N = (((Y & 0x80) == 0x80) ? true : false);
+    }
+
+// Instruction Set funcs. These can be combined with addressing mode funcs to make the instructions
 
 void CPU::ADC(Byte operand) // This happens internally and takes NO cycles
     {
@@ -178,14 +176,16 @@ void CPU::SBC(Byte operand){
 
 //http://www.6502.org/tutorials/6502opcodes.html
 
-Byte CPU::AM_IM(u32 Cycles, UnifiedMemory& memory) // addressing mode: immediate
+// Addressing Mode funcs
+
+Byte CPU::AM_IM_LOAD(u32 Cycles, UnifiedMemory& memory) // addressing mode: immediate
     {
         // takes one cycle. adds one to the program counter
         Byte operand = FetchByte(Cycles, memory); // fetch the operand
         return operand;
     }
 
-Byte CPU::AM_ABS(u32 Cycles, UnifiedMemory& memory) // you need to provide the address where the operand is
+Byte CPU::AM_ABS_LOAD(u32 Cycles, UnifiedMemory& memory) // you need to provide the address where the operand is
 {
     // advances pc by 2. takes 3 cycles
     Word address = FetchWord(Cycles, memory); // it takes 2 cycles to fetch a Word;
@@ -193,7 +193,25 @@ Byte CPU::AM_ABS(u32 Cycles, UnifiedMemory& memory) // you need to provide the a
     return operand;
 }
 
+Word CPU::AM_ABSY_STORE(u32 Cycles, UnifiedMemory& memory)
+{
+    // takes 4 cycles
+    Word base_address = FetchWord(Cycles, memory); // 2 cycles
+    Word address = base_address + Y; // add value of the Y register to the address
+    Cycles--; // this adding of Y takes 1-2 cycles depending on wether or not the address crosses into another page
 
+    // Byte basepage = base_address >> 8;
+    // Byte resultpage = address >> 8;
+    // if (basepage != resultpage){Cycles--;} // check for the crossing of the page
+
+    // on STORE stuff, this page crossing stuff always takes the extra cycle
+    Cycles--;
+
+    return address;
+}
+
+
+// this is where the magic happens
 void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clockcycles do we want to execute?
     {
         const u32 STARTCYCLES = Cycles;
@@ -207,26 +225,28 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
             Byte Instruction = FetchByte (Cycles, memory);
 
             // set 2: execute instruction. We swich here based on what instruction is fetched
+            if (DEBUG){printf("Instruction: 0x%02X\n", Instruction);};
+
             switch (Instruction)
             {
                 case INS_ADC_IM:
                 {
-                    Byte operand = AM_IM(Cycles, memory); // fetch the operand
+                    Byte operand = AM_IM_LOAD(Cycles, memory); // fetch the operand
                     ADC(operand);
                 }break;
                 case INS_ADC_ABS:
                 {
-                    Byte operand = AM_ABS(Cycles, memory);
+                    Byte operand = AM_ABS_LOAD(Cycles, memory);
                     ADC(operand); // extracted function. it adds and sets the flags
                 }break;
                 case INS_AND_IM:
                 {
-                    Byte operand = AM_IM(Cycles, memory);
+                    Byte operand = AM_IM_LOAD(Cycles, memory);
                     AND(operand); // do the AND stuff
                 }break;
                 case INS_AND_ABS:
                 {
-                    Byte operand = AM_ABS(Cycles, memory);
+                    Byte operand = AM_ABS_LOAD(Cycles, memory);
                     AND(operand);
                 }break;
                 case INS_ASL_A:
@@ -236,14 +256,46 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
                     Cycles--; // this costs 1 cycle
                     SetStatusNZbasedonA();
                 }break;
+                case INS_BEQ:
+                {
+                    Byte offset = FetchByte(Cycles, memory); // 1 cycle
+                    if (Z == 1)
+                    {
+                        SetPC_relative(Cycles, offset); // 1 cycle always + 1 cycle if PAGE is crossed
+                    }
+                }break;
+                case INS_BNE:
+                {
+                    Byte offset = FetchByte(Cycles, memory); // 1 cycle
+                    if (Z == 0)
+                    {
+                        SetPC_relative(Cycles, offset); // 1 cycle always + 1 cycle if PAGE is crossed
+                    }
+                }break;
+                case INS_BMI:
+                {
+                    Byte offset = FetchByte(Cycles, memory); // 1 cycle
+                    if (N == 1)
+                    {
+                        SetPC_relative(Cycles, offset); // 1 cycle always + 1 cycle if PAGE is crossed
+                    }
+                }break;
+                case INS_BPL:
+                {
+                    Byte offset = FetchByte(Cycles, memory); // 1 cycle
+                    if (N == 0)
+                    {
+                        SetPC_relative(Cycles, offset); // 1 cycle always + 1 cycle if PAGE is crossed
+                    }
+                }break;
                 case INS_CMP_IM:
                 {
-                    Byte operand = AM_IM(Cycles, memory);
+                    Byte operand = AM_IM_LOAD(Cycles, memory);
                     CMP(operand);
                 }break;
                 case INS_CMP_ABS:
                 {
-                    Byte operand = AM_ABS(Cycles, memory);
+                    Byte operand = AM_ABS_LOAD(Cycles, memory);
                     CMP(operand);
                 }break;
                 case INS_INX:
@@ -260,7 +312,7 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
                 }break;
                 case INS_JSR:
                 {
-                    Word Address = FetchWord(Cycles, memory); // 2 cycles
+                    Word address = FetchWord(Cycles, memory); // 2 cycles
                     // The SP decends, so to use little endian, it must first store the MSB. Who came up with this BS
                     Byte upperByte = PC >> 8; // extract upper Byte
                     pushBytetoStack(upperByte,Cycles,memory); // one cycle
@@ -269,12 +321,11 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
                     // Push return location without -1 onto the stack.
                     // in hardware, it makes sense to store PC -1. It doesn't in software.
                     // set PC to new address ( that of the subroutine ). This is an operation which can be done in a single clock cycle
-                    PC = Address;
-                    Cycles--;
+                    SetPC_absolute(Cycles, address); // takes 1 cycle
                 }break;
                 case INS_LDA_IM: // load A immediate
                 {
-                    Byte operand = AM_IM(Cycles, memory);
+                    Byte operand = AM_IM_LOAD(Cycles, memory);
                     // store value in A register
                     A = operand;
                     SetStatusNZbasedonA();
@@ -289,13 +340,13 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
                 }break;
                 case INS_LDA_ABS:
                 {
-                    Byte operand = AM_ABS(Cycles, memory);
+                    Byte operand = AM_ABS_LOAD(Cycles, memory);
                     A = operand;
                     SetStatusNZbasedonA();
                 }break;
                 case INS_LDX_IM:
                 {
-                    Byte operand = AM_IM(Cycles, memory);
+                    Byte operand = AM_IM_LOAD(Cycles, memory);
                     // store value in X register
                     X = operand;
                     SetStatusNZbasedonX();
@@ -305,16 +356,33 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
                     // This means to do nothing
                     // The PC is already incremented by reading the NOP instruction and the reading already consumes a cycle
                 }break;
+                case INS_PHA:
+                {
+                    pushBytetoStack(A, Cycles, memory); // 1 cycle
+                    // this instruction is inefficient. It takes 3 cycles
+                    // with JSR, it takes two cycles to push the return address (two Bytes) This is because the stack pointer is decremented first on previous cycles
+                    // with PHA, there is no previous cycle to decriment during.
+                    // the push is the IO operation which cannot overlap with other IO operations. but the decrement can. since its not IO
+                    Cycles--;
+                }break;
+                case INS_PLA:
+                {
+                    Byte result = pullBytefromStack(Cycles, memory); // 1 cycle
+                    Cycles--; // this is here for the same reason as the PHA instruction
+                    A = result;
+                    SetStatusNZbasedonA();
+                    Cycles--; // setting A and the flags takes an additional cycle
+                }break;
                 case INS_SBC_IM:
                 {
-                    Byte operand = AM_IM(Cycles, memory);
+                    Byte operand = AM_IM_LOAD(Cycles, memory);
                     SBC(operand);
                 }break;
                 case INS_SBC_ABS:
                 {
-                    Byte operand = AM_ABS(Cycles, memory);
+                    Byte operand = AM_ABS_LOAD(Cycles, memory);
                     SBC(operand);
-                }
+                }break;
                 case INS_STA_ABS:
                 {
                     // the addressing mode is absolute? but the operand is an address. so dont use AM_ABS
@@ -358,18 +426,72 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
                         ;
                     }
                 }break;
+                case INS_DEC_A:
+                {
+                    A -= 1; // decrement A
+                    SetStatusNZbasedonA();
+                }break;
+                case INS_LDY_IM: // load Y immediate
+                {
+                    Byte operand = AM_IM_LOAD(Cycles, memory);
+                    // store value in Y register
+                    Y = operand;
+                    SetStatusNZbasedonY();
+                }break;
+                case INS_LDY_ABS: // load Y immediate
+                {
+                    Byte operand = AM_ABS_LOAD(Cycles, memory);
+                    // store value in Y register
+                    Y = operand;
+                    SetStatusNZbasedonY();
+                }break;
+                case INS_DEY:
+                {
+                    Y -= 1; // decrement Y
+                    SetStatusNZbasedonY();
+                }break;
+                case INS_INY:
+                {
+                    Y += 1; // decrement Y
+                    SetStatusNZbasedonY();
+                }break;
+                case INS_STA_ABSY:
+                {
+                    Word address = AM_ABSY_STORE(Cycles, memory); // takes 4 cycles
+                    StoreByte(Cycles, memory, A, address); // 1 cycle
+                }break;
+                case INS_TAX:
+                {
+                    X = A; // transfer A to X
+                    Cycles--; // this takes 1 cycle
+                    SetStatusNZbasedonX();
+                }break;
 
-            default:
-            {
-                printf("Instruction not handled %d\n", Instruction);
-                Cycles = 0;
-            }
+                default:
+                {
+                    printf("Instruction not handled %d\n", Instruction);
+                    Cycles = 0;
+                }
                 break; // The instruction was not found. Make the cpu crash
                 
             }
         }
-
     }
+
+void CPU::dump_contents(){
+    std::cout << "A: " << (int)A << std::endl;
+    std::cout << "X: " << (int)X << std::endl;
+    std::cout << "Y: " << (int)Y << std::endl;
+    std::cout << "PC: " << std::hex << PC << std::endl;
+    std::cout << "SP: " << (int)SP << std::endl;
+    std::cout << "C: " << C << std::endl;
+    std::cout << "Z: " << Z << std::endl;
+    std::cout << "I: " << I << std::endl;
+    std::cout << "D: " << D << std::endl;
+    std::cout << "B: " << B << std::endl;
+    std::cout << "V: " << V << std::endl;
+    std::cout << "N: " << N << std::endl;
+}
 
 void CPU::store_output_file(const std::string& filename, uint16_t start, uint16_t end, UnifiedMemory& memory)
     {

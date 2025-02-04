@@ -13,6 +13,7 @@ public:
     void Reset(UnifiedMemory& memory);
     void Execute(u32 Cycles, UnifiedMemory& memory);
     void store_output_file(const std::string& filename, uint16_t start, uint16_t end, UnifiedMemory& memory);
+    void dump_contents();
 
 private:
     // Byte memory[65536]; // 64KB memory space
@@ -32,13 +33,16 @@ private:
     void SetPC_relative(u32& cycles, Byte offset);
     void SetStatusNZbasedonA();
     void SetStatusNZbasedonX();
+    void SetStatusNZbasedonY();
     void ADC(Byte operand);
     void AND(Byte operand);
     void CMP(Byte operand);
     void SBC(Byte operand);
 
-    Byte AM_IM(u32 Cycles, UnifiedMemory& memory); // addressing mode: immediate
-    Byte AM_ABS(u32 Cycles, UnifiedMemory& memory);
+    Byte AM_IM_LOAD(u32 Cycles, UnifiedMemory& memory); // addressing mode: immediate
+    Byte AM_ABS_LOAD(u32 Cycles, UnifiedMemory& memory);
+
+    Word AM_ABSY_STORE(u32 Cycles, UnifiedMemory& memory);
 
     static constexpr Byte INS_LDA_IM = 0xA9;
     static constexpr Byte INS_LDA_ZP = 0xA5;
@@ -62,6 +66,19 @@ private:
     static constexpr Byte INS_CMP_ABS = 0xCD;
     static constexpr Byte INS_SBC_IM = 0xE9;
     static constexpr Byte INS_SBC_ABS = 0xED;
+    static constexpr Byte INS_BEQ = 0xF0;
+    static constexpr Byte INS_PHA = 0x48;
+    static constexpr Byte INS_PLA = 0x68;
+    static constexpr Byte INS_DEC_A = 0x3A; // This is not a real instructionon the OG but it is in modern versions like the one in Ben Eater's videos
+    static constexpr Byte INS_LDY_IM = 0xA0;
+    static constexpr Byte INS_LDY_ABS = 0xAC; // didnt check if opcode is correct
+    static constexpr Byte INS_DEY = 0x88;
+    static constexpr Byte INS_BMI = 0x30;
+    static constexpr Byte INS_STA_ABSY = 0x99;
+    static constexpr Byte INS_BNE = 0xD0;
+    static constexpr Byte INS_INY = 0xC8;
+    static constexpr Byte INS_BPL = 0x10;
+    static constexpr Byte INS_TAX = 0xAA;
 };
 
 #endif // CPU_H

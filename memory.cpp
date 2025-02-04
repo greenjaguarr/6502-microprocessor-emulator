@@ -14,7 +14,7 @@ using u32 = unsigned int;
 using Byte = unsigned char;
 using Word = unsigned short;
 
-#define DEBUG false
+#define DEBUG true
 
 
 // class Mem {
@@ -106,21 +106,25 @@ Byte UnifiedMemory::Read(Word address) {
             // ROM
             return rom.Read(address);
         } else if (address == 0x5000) {
-            // External register
+            // External register for ben eater's 6502 computer
             return CHAR_IO.Read();
         } else if (address == 0x5001) {// 20481
-            // External register
-            printf("some bs is happening on address %d\n", address);
-            return 0;
+            // External register for ben eater's 6502 computer
+            if (DEBUG) {
+            printf("some read is happening on address %d\n", address);};
+            return 0xFF; // this indicates that there is a character to read
         } else if (address == 0x5002) {// 20482
-            // External register
-            printf("some bs is happening on address %d\n", address);
+            // External register for ben eater's 6502 computer
+            if (DEBUG){
+            printf("some read is happening on address %d\n", address);};
             return 0;
         } else if (address == 0x5003) {// 20483
-            // External register
-            printf("some bs is happening on address %d\n", address);
+            // External register for ben eater's 6502 computer
+            if (DEBUG){
+            printf("some read is happening on address %d\n", address);}
             return 0;
         } else {
+
             printf("Tried to read from address %d\n", address);
             throw std::out_of_range("Address not mapped");
         }
@@ -137,19 +141,22 @@ void UnifiedMemory::Write(Word address, Byte value) {
             // ROM is read-only
             throw std::runtime_error("Cannot write to ROM");
         } else if (address == 0x5000) {
-            // External register
+            // External register for ben eater's 6502 computer
             CHAR_IO.Write(value);
         } else if (address == 0x5001) {// 20481
-            // External register
-            printf("some bs is happening on address %d\n", address);
+            // External register for ben eater's 6502 computer
+            if (DEBUG) {
+            printf("some write is happening on address %d\n", address);}
             return;
         } else if (address == 0x5002) {// 20482
-            // External register
-            printf("some bs is happening on address %d\n", address);
+            // External register for ben eater's 6502 computer
+            if (DEBUG) {
+            printf("some write is happening on address %d\n", address);}
             return;
         } else if (address == 0x5003) { // 20483
-            // External register
-            printf("some bs is happening on address %d\n", address);
+            // External register for ben eater's 6502 computer
+            if (DEBUG) {
+            printf("some write is happening on address %d\n", address);}
             return;
         } else {
             printf("Tried to write to address %d\n", address);
