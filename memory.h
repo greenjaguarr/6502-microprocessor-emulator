@@ -36,9 +36,24 @@ public:
     void LoadData(const std::vector<Byte>& data);
 };
 
+class ExternalRegister {
+    Byte value;  // Only one address, so store a single byte
+    Word address;
+
+public:
+    ExternalRegister(Word addr);
+
+    Byte Read();
+    void Write(Byte newValue);
+    
+    Word GetAddress() const { return address; }
+};
+
+
 class UnifiedMemory {
     RAM ram;
     ROM rom;
+    ExternalRegister CHAR_IO;
 
 public:
     UnifiedMemory();

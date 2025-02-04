@@ -76,10 +76,25 @@ void ROM::LoadData(const std::vector<Byte>& data) {
         std::copy(data.begin(), data.end(), memory.begin());
     }
 
-
+ExternalRegister::ExternalRegister(Word addr)
+        {
+            address = addr;
+            value = 0;
+        }
+Byte ExternalRegister::Read() {
+    char input;
+    std::cin >> input;  // Read a single character
+    value = static_cast<Byte>(input);  // Store it as a Byte (unsigned char) // idk about this static cast thing
+    std::cout << "\n Just read the character " << value << std::endl;
+    return value;
+}
+void ExternalRegister::Write(Byte newValue) {
+    // value = newValue;
+    std::cout << newValue;
+}   
 
 UnifiedMemory::UnifiedMemory()
-        : ram(0x0000, 0x3FFF), rom(0x8000, 0xFFFF) {}
+        : ram(0x0000, 0x3FFF), rom(0x8000, 0xFFFF), CHAR_IO(0x5000) {}
 
 Byte UnifiedMemory::Read(Word address) {
         if (address <= 0x3FFF) {
@@ -90,7 +105,23 @@ Byte UnifiedMemory::Read(Word address) {
         } else if (address >= 0x8000) {
             // ROM
             return rom.Read(address);
+        } else if (address == 0x5000) {
+            // External register
+            return CHAR_IO.Read();
+        } else if (address == 0x5001) {// 20481
+            // External register
+            printf("some bs is happening on address %d\n", address);
+            return 0;
+        } else if (address == 0x5002) {// 20482
+            // External register
+            printf("some bs is happening on address %d\n", address);
+            return 0;
+        } else if (address == 0x5003) {// 20483
+            // External register
+            printf("some bs is happening on address %d\n", address);
+            return 0;
         } else {
+            printf("Tried to read from address %d\n", address);
             throw std::out_of_range("Address not mapped");
         }
     }
@@ -105,7 +136,23 @@ void UnifiedMemory::Write(Word address, Byte value) {
         } else if (address >= 0x8000) {
             // ROM is read-only
             throw std::runtime_error("Cannot write to ROM");
+        } else if (address == 0x5000) {
+            // External register
+            CHAR_IO.Write(value);
+        } else if (address == 0x5001) {// 20481
+            // External register
+            printf("some bs is happening on address %d\n", address);
+            return;
+        } else if (address == 0x5002) {// 20482
+            // External register
+            printf("some bs is happening on address %d\n", address);
+            return;
+        } else if (address == 0x5003) { // 20483
+            // External register
+            printf("some bs is happening on address %d\n", address);
+            return;
         } else {
+            printf("Tried to write to address %d\n", address);
             throw std::out_of_range("Address not mapped");
         }
     }

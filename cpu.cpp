@@ -190,6 +190,7 @@ Byte CPU::AM_ABS(u32 Cycles, UnifiedMemory& memory) // you need to provide the a
     // advances pc by 2. takes 3 cycles
     Word address = FetchWord(Cycles, memory); // it takes 2 cycles to fetch a Word;
     Byte operand = ReadByte(Cycles, memory, address); // it takes 1 cycle to fetch the Byte
+    return operand;
 }
 
 
@@ -360,7 +361,8 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
 
             default:
             {
-                printf("Instruction not handled %d", Instruction);
+                printf("Instruction not handled %d\n", Instruction);
+                Cycles = 0;
             }
                 break; // The instruction was not found. Make the cpu crash
                 
