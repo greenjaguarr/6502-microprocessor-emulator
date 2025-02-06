@@ -36,11 +36,11 @@ NOTCR:
 ESCAPE:
                 LDA     #$5C           ; "\".
                 JSR     ECHO           ; Output it.
+                
 
 GETLINE:
                 LDA     #$0D           ; Send CR
                 JSR     ECHO
-
                 LDY     #$01           ; Initialize text index.
 BACKSPACE:      DEY                    ; Back up text index.
                 BMI     GETLINE        ; Beyond start of line, reinitialize.

@@ -177,6 +177,16 @@ void CPU::LDA(Byte operand){
     A = operand;
     SetStatusNZbasedonA();
 }
+void CPU::EOR(Byte operand){
+    A = A ^ operand;
+    SetStatusNZbasedonA();
+} 
+void CPU::CPY(Byte operant){
+    Word temp = Y - operant;
+    C = (Y >= operant) ? 1 : 0;
+    Z = (temp == 0) ? 1 : 0;
+    N = (temp & 0x80) ? 1 : 0;
+}
 //http://www.6502.org/tutorials/6502opcodes.html
 
 // Addressing Mode funcs
@@ -207,6 +217,14 @@ Byte CPU::AM_ABSY_LOAD(u32 Cycles, UnifiedMemory& memory)
     // if (basepage != resultpage){Cycles--;} // check for the crossing of the page
 
     return address;
+}
+Byte CPU::AM_ZP_LOAD(u32 Cycles, UnifiedMemory& memory)
+{
+    
+    Byte lower_address = FetchByte(Cycles, memory); // operand indicates where in the zero page, the value is located // 1 cycle
+    Word address = 0x0000 | (Word)lower_address; // happends internally so no cycle taken
+    Byte operand = ReadByte(Cycles, memory, address); // 1 cycle (IO operation)
+    return operand;
 }
 
 Word CPU::AM_ABSY_STORE(u32 Cycles, UnifiedMemory& memory)
@@ -247,7 +265,7 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
             Byte Instruction = FetchByte (Cycles, memory);
 
             // set 2: execute instruction. We swich here based on what instruction is fetched
-            if (DEBUG){printf("Instruction: 0x%02X\n", Instruction);};
+            if (DEBUG){printf("Instruction: 0x%02X\n", Instruction);printf("PC: 0x%02X\n", PC-1);};
 
             switch (Instruction)
             {
@@ -361,9 +379,7 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
                 }break;
                 case INS_LDA_ZP: // load A from zero page
                 {
-                    Byte lower_address = FetchByte (Cycles, memory); // operand indicates where in the zero page, the value is located
-                    Word address = 0x0000 | (Word)lower_address;  //yt vid doet dit niet????
-                    Byte operand = ReadByte(Cycles, memory, address);
+                    Byte operand = AM_ZP_LOAD(Cycles, memory);
                     LDA(operand);
                 }break;
                 case INS_LDA_ABS:
@@ -512,6 +528,41 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
                 {
                     Word address = AM_ZP_STORE(Cycles, memory);
                     StoreByte(Cycles, memory, Y, address);
+                }break;
+                case INS_EOR_IM:
+                {
+                    Byte operand = AM_IM_LOAD(Cycles, memory);
+                    EOR(operand);
+                }break;
+                case INS_EOR_ABS:
+                {
+                    Byte operand = AM_ABS_LOAD(Cycles, memory);
+                    EOR(operand);
+                }break;
+                case INS_EOR_ZP:
+                {
+                    Byte operand = AM_ZP_LOAD(Cycles, memory);
+                    EOR(operand);
+                }break;
+                case INS_CPY_IM:
+                {
+                    Byte operand = AM_IM_LOAD(Cycles, memory);
+                    CPY(operand);
+                }break;
+                case INS_CPY_ABS:
+                {
+                    Byte operand = AM_ABS_LOAD(Cycles, memory);
+                    CPY(operand);
+                }break;
+                case INS_CPY_ZP:
+                {
+                    Byte operand = AM_ZP_LOAD(Cycles, memory);
+                    CPY(operand);
+                }break;
+                case INS_BRK:
+                {
+                    Cycles=0; // this is a software stop
+                    printf("Encountered BRK instruction. Aborting...\n");
                 }break;
 
                 default:

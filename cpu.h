@@ -39,10 +39,13 @@ private:
     void CMP(Byte operand);
     void SBC(Byte operand);
     void LDA(Byte operand);
+    void EOR(Byte operand);
+    void CPY(Byte operand);
 
     Byte AM_IM_LOAD(u32 Cycles, UnifiedMemory& memory); // addressing mode: immediate
     Byte AM_ABS_LOAD(u32 Cycles, UnifiedMemory& memory);
     Byte AM_ABSY_LOAD(u32 Cycles, UnifiedMemory& memory);
+    Byte AM_ZP_LOAD(u32 Cycles, UnifiedMemory& memory);
 
     Word AM_ABSY_STORE(u32 Cycles, UnifiedMemory& memory);
     Word AM_ZP_STORE(u32 Cycles, UnifiedMemory& memory);
@@ -87,6 +90,13 @@ private:
     static constexpr Byte INS_BCC = 0x90;
     static constexpr Byte INS_STX_ZP = 0x86;
     static constexpr Byte INS_STY_ZP = 0x84;
+    static constexpr Byte INS_EOR_IM = 0x49;
+    static constexpr Byte INS_EOR_ABS = 0x4D;
+    static constexpr Byte INS_EOR_ZP = 0x45;
+    static constexpr Byte INS_CPY_IM = 0xC0;
+    static constexpr Byte INS_CPY_ZP = 0xC4;
+    static constexpr Byte INS_CPY_ABS = 0xCC;
+    static constexpr Byte INS_BRK = 0x00;
 };
 
 #endif // CPU_H
