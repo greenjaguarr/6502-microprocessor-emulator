@@ -19,3 +19,7 @@ vasm6502_oldstyle -o memory.bin <asm_files/assembly file>
 to make the memory.
 Next you can use ./run to compile and run the entire thing
 use hexdump -C output.bin to see the result
+
+vasm6502_oldstyle -wdc02 -o memory.bin asm_files/wozmon.s 
+There is an illegal opcode DEC = 0x3A. Decrement the A register. This is not on the original NMOS but it is on the 6502 in ben eaters videos
+vasm6502_oldstyle -o memory.bin asm_files/wozmon_copy.s

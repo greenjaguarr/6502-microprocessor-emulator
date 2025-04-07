@@ -22,7 +22,7 @@ using Word = unsigned short;
 // std::vector<Byte> memory;
 // Word start_address, end_address;
 // public:
-Mem::Mem(Word start, Word end) 
+Mem::Mem(Word start, Word end)  // abstract base class for RAM and ROM
         : start_address(start), end_address(end), memory(end - start + 1, 0) {}
 
 Byte Mem::Read(Word address) {
@@ -76,10 +76,27 @@ void ROM::LoadData(const std::vector<Byte>& data) {
         std::copy(data.begin(), data.end(), memory.begin());
     }
 
-
+ExternalRegister::ExternalRegister(Word addr)
+        {
+            address = addr;
+            value = 0;
+        }
+Byte ExternalRegister::Read() {
+    char input;
+    std::cin >> input;  // Read a single character
+    value = static_cast<Byte>(input);  // Store it as a Byte (unsigned char) // idk about this static cast thing
+    if (DEBUG) {
+        printf("Just read the character %c\n", value);
+    }
+    return value;
+}
+void ExternalRegister::Write(Byte newValue) {
+    // value = newValue;
+    std::cout << newValue;
+}   
 
 UnifiedMemory::UnifiedMemory()
-        : ram(0x0000, 0x3FFF), rom(0x8000, 0xFFFF) {}
+        : ram(0x0000, 0x3FFF), rom(0x8000, 0xFFFF), CHAR_IO(0x5000) {}
 
 Byte UnifiedMemory::Read(Word address) {
         if (address <= 0x3FFF) {
@@ -90,7 +107,27 @@ Byte UnifiedMemory::Read(Word address) {
         } else if (address >= 0x8000) {
             // ROM
             return rom.Read(address);
+        } else if (address == 0x5000) {
+            // External register for ben eater's 6502 computer
+            return CHAR_IO.Read();
+        } else if (address == 0x5001) {// 20481
+            // External register for ben eater's 6502 computer
+            if (DEBUG) {
+            printf("some read is happening on address %d\n", address);};
+            return 0xFF; // this indicates that there is a character to read
+        } else if (address == 0x5002) {// 20482
+            // External register for ben eater's 6502 computer
+            if (DEBUG){
+            printf("some read is happening on address %d\n", address);};
+            return 0;
+        } else if (address == 0x5003) {// 20483
+            // External register for ben eater's 6502 computer
+            if (DEBUG){
+            printf("some read is happening on address %d\n", address);}
+            return 0;
         } else {
+
+            printf("Tried to read from address %d\n", address);
             throw std::out_of_range("Address not mapped");
         }
     }
@@ -105,7 +142,26 @@ void UnifiedMemory::Write(Word address, Byte value) {
         } else if (address >= 0x8000) {
             // ROM is read-only
             throw std::runtime_error("Cannot write to ROM");
+        } else if (address == 0x5000) {
+            // External register for ben eater's 6502 computer
+            CHAR_IO.Write(value);
+        } else if (address == 0x5001) {// 20481
+            // External register for ben eater's 6502 computer
+            if (DEBUG) {
+            printf("some write is happening on address %d\n", address);}
+            return;
+        } else if (address == 0x5002) {// 20482
+            // External register for ben eater's 6502 computer
+            if (DEBUG) {
+            printf("some write is happening on address %d\n", address);}
+            return;
+        } else if (address == 0x5003) { // 20483
+            // External register for ben eater's 6502 computer
+            if (DEBUG) {
+            printf("some write is happening on address %d\n", address);}
+            return;
         } else {
+            printf("Tried to write to address %d\n", address);
             throw std::out_of_range("Address not mapped");
         }
     }

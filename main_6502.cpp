@@ -10,11 +10,12 @@
 
 #define memory_source "memory.bin"
 #define output_file "output.bin"
-#define n_cycles 500
+#define n_cycles 3000
 #define start_address 0x2000
 #define end_address 0x3fff
 
 int main() {
+    printf("Hello, World!\n");
     // Initialize UnifiedMemory which combines ROM, RAM, and I/O
     UnifiedMemory memory;
 
@@ -31,6 +32,7 @@ int main() {
     // Execute a certain number of clock cycles
     cpu.Execute(n_cycles, memory); // You can modify Execute() to accept memory
 
+    cpu.dump_contents();
     // Store the output in a file from memory region 0x6000-0x6FFF
     cpu.store_output_file(output_file, start_address, end_address, memory);
 

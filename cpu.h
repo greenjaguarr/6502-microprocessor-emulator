@@ -13,14 +13,15 @@ public:
     void Reset(UnifiedMemory& memory);
     void Execute(u32 Cycles, UnifiedMemory& memory);
     void store_output_file(const std::string& filename, uint16_t start, uint16_t end, UnifiedMemory& memory);
+    void dump_contents();
 
 private:
-    uint8_t memory[65536]; // 64KB memory space
-    uint16_t PC = 0;  // Program Counter
-    uint8_t A = 0, X=0, Y=0; // Registers
+    // Byte memory[65536]; // 64KB memory space
+    Word PC = 0;  // Program Counter
+    Byte A = 0, X=0, Y=0; // Registers
     // uint8_t status; // Status register
     bool C=false, Z=false, I=false, D=false, B=false, V=false, N=false; // Flags
-    uint8_t SP; // Stack Pointer
+    Byte SP; // Stack Pointer
 
     Byte FetchByte(u32& cycles, UnifiedMemory& memory);
     Word FetchWord(u32& cycles, UnifiedMemory& memory);
@@ -32,8 +33,22 @@ private:
     void SetPC_relative(u32& cycles, Byte offset);
     void SetStatusNZbasedonA();
     void SetStatusNZbasedonX();
+    void SetStatusNZbasedonY();
     void ADC(Byte operand);
     void AND(Byte operand);
+    void CMP(Byte operand);
+    void SBC(Byte operand);
+    void LDA(Byte operand);
+    void EOR(Byte operand);
+    void CPY(Byte operand);
+
+    Byte AM_IM_LOAD(u32 Cycles, UnifiedMemory& memory); // addressing mode: immediate
+    Byte AM_ABS_LOAD(u32 Cycles, UnifiedMemory& memory);
+    Byte AM_ABSY_LOAD(u32 Cycles, UnifiedMemory& memory);
+    Byte AM_ZP_LOAD(u32 Cycles, UnifiedMemory& memory);
+
+    Word AM_ABSY_STORE(u32 Cycles, UnifiedMemory& memory);
+    Word AM_ZP_STORE(u32 Cycles, UnifiedMemory& memory);
 
     static constexpr Byte INS_LDA_IM = 0xA9;
     static constexpr Byte INS_LDA_ZP = 0xA5;
@@ -53,6 +68,35 @@ private:
     static constexpr Byte INS_INX = 0xE8;
     static constexpr Byte INS_LDA_ABS = 0xAD;
     static constexpr Byte INS_BVS = 0x70;
+    static constexpr Byte INS_CMP_IM = 0xC9;
+    static constexpr Byte INS_CMP_ABS = 0xCD;
+    static constexpr Byte INS_SBC_IM = 0xE9;
+    static constexpr Byte INS_SBC_ABS = 0xED;
+    static constexpr Byte INS_BEQ = 0xF0;
+    static constexpr Byte INS_PHA = 0x48;
+    static constexpr Byte INS_PLA = 0x68;
+    static constexpr Byte INS_DEC_A = 0x3A; // This is not a real instructionon the OG but it is in modern versions like the one in Ben Eater's videos
+    static constexpr Byte INS_LDY_IM = 0xA0;
+    static constexpr Byte INS_LDY_ABS = 0xAC; // didnt check if opcode is correct
+    static constexpr Byte INS_DEY = 0x88;
+    static constexpr Byte INS_BMI = 0x30;
+    static constexpr Byte INS_STA_ABSY = 0x99;
+    static constexpr Byte INS_BNE = 0xD0;
+    static constexpr Byte INS_INY = 0xC8;
+    static constexpr Byte INS_BPL = 0x10;
+    static constexpr Byte INS_TAX = 0xAA;
+    static constexpr Byte INS_STA_ZP = 0x85;
+    static constexpr Byte INS_LDA_ABSY = 0xB9;
+    static constexpr Byte INS_BCC = 0x90;
+    static constexpr Byte INS_STX_ZP = 0x86;
+    static constexpr Byte INS_STY_ZP = 0x84;
+    static constexpr Byte INS_EOR_IM = 0x49;
+    static constexpr Byte INS_EOR_ABS = 0x4D;
+    static constexpr Byte INS_EOR_ZP = 0x45;
+    static constexpr Byte INS_CPY_IM = 0xC0;
+    static constexpr Byte INS_CPY_ZP = 0xC4;
+    static constexpr Byte INS_CPY_ABS = 0xCC;
+    static constexpr Byte INS_BRK = 0x00;
 };
 
 #endif // CPU_H
