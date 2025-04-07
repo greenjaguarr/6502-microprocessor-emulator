@@ -77,10 +77,10 @@ void ROM::LoadData(const std::vector<Byte>& data) {
     }
 
 ExternalRegister::ExternalRegister(Word addr)
-        {
-            address = addr;
-            value = 0;
-        }
+{
+    address = addr;
+    value = 0;
+}
 Byte ExternalRegister::Read() {
     char input;
     std::cin >> input;  // Read a single character
@@ -91,8 +91,11 @@ Byte ExternalRegister::Read() {
     return value;
 }
 void ExternalRegister::Write(Byte newValue) {
-    // value = newValue;
-    std::cout << newValue;
+    // std::cout << newValue;
+    /* There is a character being outputted.
+    This output is making me confused.
+    For now, I will simple define an output buffer where I can put char's into in RAM */
+    
 }   
 
 UnifiedMemory::UnifiedMemory()
