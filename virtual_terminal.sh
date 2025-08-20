@@ -26,9 +26,17 @@ cat "$OUT_PIPE" &
 # Main loop: read from keyboard and send to emulator input
 while true; do
     # read one char at a time
-    IFS= read -r -n1 char
+    IFS= read -r -n1 -d '' char
     if [ "$char" ]; then
+        if [ "$char" = $'\r' ]; then
+        # Map Enter (CR) → newline (0x0A)
+            printf '\n' > "$IN_PIPE"
+            # echo -n "\n" > "$IN_PIPE"
         # send char to emulator
-        echo -n "$char" > "$IN_PIPE"
+        # echo -n "$char" > "$IN_PIPE"
+        else
+            # echo -n "$char" > "$IN_PIPE"
+            printf '%s' "$char" > "$IN_PIPE"
+        fi
     fi
 done

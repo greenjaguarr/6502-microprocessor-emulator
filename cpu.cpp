@@ -425,7 +425,7 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
                     // This means to do nothing
                     // The PC is already incremented by reading the NOP instruction and the reading already consumes a cycle
                     // printf("[INFO] NOP \n");
-                    usleep(1000000);
+                    usleep(100000);
                 }break;
                 case INS_PHA:
                 {

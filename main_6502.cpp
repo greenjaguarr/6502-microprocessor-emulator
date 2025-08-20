@@ -10,7 +10,7 @@
 
 #define memory_source "memory.bin"
 #define output_file "output.bin"
-#define n_cycles 3000
+#define n_cycles 30000
 #define start_address 0x2000
 #define end_address 0x3fff
 

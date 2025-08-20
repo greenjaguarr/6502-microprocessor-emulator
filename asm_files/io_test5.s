@@ -21,6 +21,7 @@ loop:
     jsr get_char
     CPX #0
     BEQ wait
+    ; we have obtained a valid char! yay
     jsr store_val
     jmp loop
 
@@ -74,8 +75,8 @@ pipe_closed:
     INX
     TXA
     STA pipe_closed_amount
-    CMP #10
-    BMI loop ; BPL or bMI
+    CMP #50
+    BMI loop ; BPL or bMI ; This is where there is a RTS missing? I think that is why the stack keeps growing. I am leaking memory haha
 
 end:
     LDA #61

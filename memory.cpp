@@ -146,11 +146,11 @@ Byte UnifiedMemory::Read(Word address) {
 
     // fix the input and output stream. a separate bash program is responsible for making the pipes and managing
     } else if (address == 0x6008) {
-        // printf("Reading a char 6008 \n");
         // Since we are taking a char form the instream, the current char is no longer valid
         Byte c;
         c = INSTREAM.Read(); // This just gives the value that is in the register
         INSTATUS.Write(INSTATUS.Read() & 0b11110111); // set the bit to 0:: indicate no new char available
+        // printf("Reading a char at 6008, char is %c , with hex value %02X \n", c, c);
         return c;
     } else if (address == 0x6009) {
         Byte c;
