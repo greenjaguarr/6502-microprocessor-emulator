@@ -20,9 +20,7 @@ using Word = unsigned short;
 
 #define DEBUG false
 
-int in_fd = -1;
-int out_fd = -1;
-int infile_fd = -1;
+
 
 // class Mem {
 // protected:

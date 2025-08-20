@@ -9,6 +9,10 @@ using u32 = unsigned int;
 using Byte = unsigned char;
 using Word = unsigned short;
 
+int in_fd = -1;
+int out_fd = -1;
+int infile_fd = -1;
+
 class Mem {
 protected:
     std::vector<Byte> memory;
