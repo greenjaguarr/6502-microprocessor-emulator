@@ -42,9 +42,9 @@ private:
     void EOR(Byte operand);
     void CPY(Byte operand);
 
-    Byte AM_IM_LOAD(u32 Cycles, UnifiedMemory& memory); // addressing mode: immediate
-    Byte AM_ABS_LOAD(u32 Cycles, UnifiedMemory& memory);
-    Byte AM_ABSY_LOAD(u32 Cycles, UnifiedMemory& memory);
+    Byte AM_IM_LOAD(u32 Cycles, UnifiedMemory& memory); // addressing mode: immediate; Load data from the code at the SP
+    Byte AM_ABS_LOAD(u32 Cycles, UnifiedMemory& memory); // addressing mode: absolute; Load data from an address provided in the code
+    Byte AM_ABSY_LOAD(u32 Cycles, UnifiedMemory& memory); // addressing mode: absolute with offset Y. Y is treated as a two's compliment integer, possibly negative
     Byte AM_ZP_LOAD(u32 Cycles, UnifiedMemory& memory);
 
     Word AM_ABSY_STORE(u32 Cycles, UnifiedMemory& memory);

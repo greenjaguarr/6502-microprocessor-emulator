@@ -37,7 +37,7 @@ public:
 };
 
 class ExternalRegister {
-    Byte value;  // Only one address, so store a single byte
+    Byte value;  // It has only one address, so it can only store a single byte
     Word address;
 
 public:
