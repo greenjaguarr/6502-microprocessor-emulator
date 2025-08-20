@@ -17,7 +17,7 @@ using u32 = unsigned int;
 using Byte = unsigned char;
 using Word = unsigned short;
 
-#define DEBUG true
+#define DEBUG false
 
 
 void CPU::Reset(UnifiedMemory &memory) {
@@ -166,6 +166,12 @@ void CPU::CMP(Byte operand){
     Z = (temp == 0) ? 1 : 0;
     N = (temp & 0x80) ? 1 : 0;
 }
+void CPU::CPX(Byte operand){
+    Word temp = X - operand;
+    C = (X >= operand) ? 1 : 0;
+    Z = (temp == 0) ? 1 : 0;
+    N = (temp & 0x80) ? 1 : 0;
+}
 void CPU::SBC(Byte operand){
     Word temp = A - operand - (1 - C);
     C = (temp < 0x100) ? 1 : 0;                            // Carry is set if no borrow occurs
@@ -177,6 +183,10 @@ void CPU::SBC(Byte operand){
 void CPU::LDA(Byte operand){
     A = operand;
     SetStatusNZbasedonA();
+}
+void CPU::LDX(Byte operand){
+    X = operand;
+    SetStatusNZbasedonX();
 }
 void CPU::EOR(Byte operand){
     A = A ^ operand;
@@ -258,7 +268,7 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
         const u32 STARTCYCLES = Cycles;
         while ((Cycles > 0) && (Cycles<= STARTCYCLES))
         {
-            printf("Next instruction\n");
+            if (DEBUG) {printf("Next instruction\n");}
             // debug info
             if (DEBUG){
                 std::cout << "[DEBUG]" << Cycles << " Cycles remaining" << std::endl;
@@ -348,6 +358,11 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
                     Byte operand = AM_ABS_LOAD(Cycles, memory);
                     CMP(operand);
                 }break;
+                case INS_CPX_IM:
+                {
+                    Byte operand = AM_IM_LOAD(Cycles, memory);
+                    CPX(operand);
+                }break;
                 case INS_INX:
                 {
                     X += 1; // increment the X register
@@ -398,14 +413,19 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
                 {
                     Byte operand = AM_IM_LOAD(Cycles, memory);
                     // store value in X register
-                    X = operand;
-                    SetStatusNZbasedonX();
+                    LDX(operand);
+                }break;
+                case INS_LDX_ZP: // load A from zero page
+                {
+                    Byte operand = AM_ZP_LOAD(Cycles, memory);
+                    LDX(operand);
                 }break;
                 case INS_NOP:
                 {
                     // This means to do nothing
                     // The PC is already incremented by reading the NOP instruction and the reading already consumes a cycle
-                    usleep(100);
+                    printf("[INFO] NOP \n");
+                    usleep(1000000);
                 }break;
                 case INS_PHA:
                 {
@@ -516,6 +536,12 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
                     X = A; // transfer A to X
                     Cycles--; // this takes 1 cycle
                     SetStatusNZbasedonX();
+                }break;
+                case INS_TXA:
+                {
+                    A = X; // transfer A to X
+                    Cycles--; // this takes 1 cycle
+                    SetStatusNZbasedonA();
                 }break;
                 case INS_STA_ZP:
                 {

@@ -10,7 +10,7 @@
 
 #define memory_source "memory.bin"
 #define output_file "output.bin"
-#define n_cycles 300
+#define n_cycles 3000
 #define start_address 0x2000
 #define end_address 0x3fff
 
@@ -29,14 +29,12 @@ int main() {
     CPU cpu;
     cpu.Reset(memory);
 
-    memory.Write(0x3FCF, 0xEA);
-
     // Execute a certain number of clock cycles
     cpu.Execute(n_cycles, memory); // You can modify Execute() to accept memory
 
     cpu.dump_contents();
     // Store the output in a file from memory region 0x6000-0x6FFF
-    // cpu.store_output_file(output_file, start_address, end_address, memory);      //ENABLE this for serious stuff, disable for testing sometimes
+    cpu.store_output_file(output_file, start_address, end_address, memory);      //ENABLE this for serious stuff, disable for testing sometimes
 
     return 0;
 };

@@ -37,8 +37,10 @@ private:
     void ADC(Byte operand);
     void AND(Byte operand);
     void CMP(Byte operand);
+    void CPX(Byte operand);
     void SBC(Byte operand);
     void LDA(Byte operand);
+    void LDX(Byte operand);
     void EOR(Byte operand);
     void CPY(Byte operand);
 
@@ -97,6 +99,9 @@ private:
     static constexpr Byte INS_CPY_ZP = 0xC4;
     static constexpr Byte INS_CPY_ABS = 0xCC;
     static constexpr Byte INS_BRK = 0x00;
+    static constexpr Byte INS_LDX_ZP = 0xA6;
+    static constexpr Byte INS_TXA = 0x8A;
+    static constexpr Byte INS_CPX_IM = 0xE0;
 };
 
 #endif // CPU_H

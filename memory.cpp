@@ -18,11 +18,11 @@ using u32 = unsigned int;
 using Byte = unsigned char;
 using Word = unsigned short;
 
-#define DEBUG true
+#define DEBUG false
 
 int in_fd = -1;
 int out_fd = -1;
-
+int infile_fd = -1;
 
 // class Mem {
 // protected:
@@ -99,11 +99,16 @@ UnifiedMemory::UnifiedMemory()
         : ram(0x0000, 0x3FFF), rom(0x8000, 0xFFFF), 
         CHAR_IO(0x5000), INSTREAM(0x6008),
          INSTATUS(0x6009), OUTSTREAM(0x600A), 
-         OUTSTATUS(0x600B) 
+         OUTSTATUS(0x600B), FILEIN(0x6004), STDOUT(0x6005)
         {
 
             out_fd = open("out_stream", O_WRONLY | O_NONBLOCK);
             in_fd = open("in_stream", O_RDONLY | O_NONBLOCK);
+            infile_fd = open("input_text.txt", O_RDONLY);
+            if (infile_fd < 0) {
+                perror("Failed to open text file");
+                exit(1);
+            }
         }
 
 Byte UnifiedMemory::Read(Word address) {
@@ -147,32 +152,44 @@ Byte UnifiedMemory::Read(Word address) {
         c = INSTREAM.Read(); // This just gives the value that is in the register
         INSTATUS.Write(INSTATUS.Read() & 0b11110111); // set the bit to 0:: indicate no new char available
         return c;
-} else if (address == 0x6009) {
-    Byte c;
-    ssize_t n = read(in_fd, &c, 1);  // try to read 1 byte
-    if (DEBUG) {printf("Trying to read byte from in_stream, i got %c \n", c);}
-    if (n == 1) {
-        // Successfully read a byte, store it in INSTREAM and set status bit
-        INSTREAM.Write(c);
-        INSTATUS.Write(INSTATUS.Read() | 0b00001000); // set bit 3: new char available
-        if (DEBUG) printf("Read new char from pipe: %c\n", c);
-    } else if (n == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-        // No data available yet; normal for non-blocking
-        if (DEBUG) printf("No new char available\n");
-        INSTATUS.Write(INSTATUS.Read() & 0xF7); // clear bit 3: no new char available
+    } else if (address == 0x6009) {
+        Byte c;
+        ssize_t n = read(in_fd, &c, 1);  // try to read 1 byte
+        if (DEBUG) {printf("Trying to read byte from in_stream, i got %c \n", c);}
+        if (n == 1) {
+            // Successfully read a byte, store it in INSTREAM and set status bit
+            INSTREAM.Write(c);
+            INSTATUS.Write(0x08); // set bit 3: new char available
+            if (DEBUG) printf("Read new char from pipe: %c\n", c);
+        } else if (n == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+            // No data available yet; normal for non-blocking
+            if (DEBUG) printf("No new char available\n");
+            INSTATUS.Write(0x10); // set bit 4: no char and no problem, try again later
 
-    } else if (n == 0) {
-        // Pipe closed (EOF)
-        if (DEBUG) printf("Pipe closed\n");
-    } else {
-        // Real error
-        perror("read failed");
-    }
-    return INSTATUS.Read();
+        } else if (n == 0) {
+            // Pipe closed (EOF)
+            printf("Pipe closed\n");
+            INSTATUS.Write(0x20); // EOF. Pack it up
+            // printf("Warning: Pipe closed \n");
+        } else {
+            // Real error
+            perror("read failed");
+            INSTATUS.Write(0x40); // Big error. Exit immediately
+        }
+        return INSTATUS.Read();
     } else if (address == 0x600A) {
         return OUTSTREAM.Read();
     } else if (address == 0x600B) {
         return OUTSTATUS.Read();
+    } else if (address == 0x6004){
+        Byte c;
+        ssize_t n = read(infile_fd, &c, 1);
+        if (n==1) {
+            return c;
+        }
+        else {
+            return 0;
+        }
     } else {
 
         printf("Tried to read from address %d\n", address);
@@ -181,7 +198,7 @@ Byte UnifiedMemory::Read(Word address) {
 }
 
 void UnifiedMemory::Write(Word address, Byte value) {
-        printf("Memory is write accessed at address %04X \n", address);
+        if (DEBUG) {printf("Memory is write accessed at address %04X \n", address);}
         if (address <= 0x3FFF) {
             // RAM with mirroring
             ram.Write(address, value);
@@ -223,6 +240,11 @@ void UnifiedMemory::Write(Word address, Byte value) {
             OUTSTATUS.Write(OUTSTATUS.Read() & 0xFE);
         } else if (address == 0x600B) {
             OUTSTATUS.Write(value);
+        } else if (address == 0x6004) {
+            throw std::runtime_error("Cannot write to this location");
+        } else if (address == 0x6005) {  // our new output-only register
+            std::cout << static_cast<char>(value);
+            std::cout.flush(); // make sure it appears immediately
         } else {
             printf("Tried to write to address %d\n", address);
             throw std::out_of_range("Address not mapped");

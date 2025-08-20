@@ -58,7 +58,8 @@ class UnifiedMemory {
     ExternalRegister INSTATUS;
     ExternalRegister OUTSTREAM;
     ExternalRegister OUTSTATUS;
-
+    ExternalRegister FILEIN; // take a file as input
+    ExternalRegister STDOUT; // write only output
 public:
     UnifiedMemory();
     Byte Read(Word address);
