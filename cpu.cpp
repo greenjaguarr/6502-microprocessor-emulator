@@ -4,6 +4,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <unistd.h>
 
 #include "memory.h"
 #include "cpu.h"
@@ -16,7 +17,7 @@ using u32 = unsigned int;
 using Byte = unsigned char;
 using Word = unsigned short;
 
-#define DEBUG false
+#define DEBUG true
 
 
 void CPU::Reset(UnifiedMemory &memory) {
@@ -257,12 +258,13 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
         const u32 STARTCYCLES = Cycles;
         while ((Cycles > 0) && (Cycles<= STARTCYCLES))
         {
+            printf("Next instruction\n");
             // debug info
             if (DEBUG){
-                std::cout << "[DEBUG]" << Cycles << std::endl;
+                std::cout << "[DEBUG]" << Cycles << " Cycles remaining" << std::endl;
             }
             // step 1: fetch next instruction from memory
-            Byte Instruction = FetchByte (Cycles, memory);
+            Byte Instruction = FetchByte(Cycles, memory);
 
             // set 2: execute instruction. We swich here based on what instruction is fetched
             if (DEBUG){printf("Instruction: 0x%02X\n", Instruction);printf("PC: 0x%02X\n", PC-1);};
@@ -403,6 +405,7 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
                 {
                     // This means to do nothing
                     // The PC is already incremented by reading the NOP instruction and the reading already consumes a cycle
+                    usleep(100);
                 }break;
                 case INS_PHA:
                 {
@@ -567,7 +570,7 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
 
                 default:
                 {
-                    printf("Instruction not handled %d\n", Instruction);
+                    printf("Instruction not handled %02X \n", Instruction);
                     Cycles = 0;
                 }
                 break; // The instruction was not found. Make the cpu crash

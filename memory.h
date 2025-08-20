@@ -54,6 +54,10 @@ class UnifiedMemory {
     RAM ram;
     ROM rom;
     ExternalRegister CHAR_IO;
+    ExternalRegister INSTREAM;
+    ExternalRegister INSTATUS;
+    ExternalRegister OUTSTREAM;
+    ExternalRegister OUTSTATUS;
 
 public:
     UnifiedMemory();

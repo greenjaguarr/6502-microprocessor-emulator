@@ -1,9 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <fcntl.h>
+#include <unistd.h>
+
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <sstream> // this is for the character input stream i thinkclear
 
 #include "memory.h"
 // http://www.obelisk.me.uk/6502/
@@ -14,7 +18,10 @@ using u32 = unsigned int;
 using Byte = unsigned char;
 using Word = unsigned short;
 
-#define DEBUG false
+#define DEBUG true
+
+int in_fd = -1;
+int out_fd = -1;
 
 
 // class Mem {
@@ -82,57 +89,99 @@ ExternalRegister::ExternalRegister(Word addr)
             value = 0;
         }
 Byte ExternalRegister::Read() {
-    char input;
-    std::cin >> input;  // Read a single character
-    value = static_cast<Byte>(input);  // Store it as a Byte (unsigned char) // idk about this static cast thing
-    if (DEBUG) {
-        printf("Just read the character %c\n", value);
-    }
     return value;
 }
 void ExternalRegister::Write(Byte newValue) {
-    // value = newValue;
-    std::cout << newValue;
+    value = newValue;
 }   
 
 UnifiedMemory::UnifiedMemory()
-        : ram(0x0000, 0x3FFF), rom(0x8000, 0xFFFF), CHAR_IO(0x5000) {}
+        : ram(0x0000, 0x3FFF), rom(0x8000, 0xFFFF), 
+        CHAR_IO(0x5000), INSTREAM(0x6008),
+         INSTATUS(0x6009), OUTSTREAM(0x600A), 
+         OUTSTATUS(0x600B) 
+        {
+
+            out_fd = open("out_stream", O_WRONLY | O_NONBLOCK);
+            in_fd = open("in_stream", O_RDONLY | O_NONBLOCK);
+        }
 
 Byte UnifiedMemory::Read(Word address) {
-        if (address <= 0x3FFF) {
-            return ram.Read(address);
-        // } else if (address >= 0x2000 && address <= 0x3FFF) {
-            // I/O Registers
-            // return ioRegisters[address % 8]; // Example: NES-like mirroring
-        } else if (address >= 0x8000) {
-            // ROM
-            return rom.Read(address);
-        } else if (address == 0x5000) {
-            // External register for ben eater's 6502 computer
-            return CHAR_IO.Read();
-        } else if (address == 0x5001) {// 20481
-            // External register for ben eater's 6502 computer
-            if (DEBUG) {
-            printf("some read is happening on address %d\n", address);};
-            return 0xFF; // this indicates that there is a character to read
-        } else if (address == 0x5002) {// 20482
-            // External register for ben eater's 6502 computer
-            if (DEBUG){
-            printf("some read is happening on address %d\n", address);};
-            return 0;
-        } else if (address == 0x5003) {// 20483
-            // External register for ben eater's 6502 computer
-            if (DEBUG){
-            printf("some read is happening on address %d\n", address);}
-            return 0;
-        } else {
+    
+    if (DEBUG) {printf("Memory is read accessed at address %04X \n", address);}
 
-            printf("Tried to read from address %d\n", address);
-            throw std::out_of_range("Address not mapped");
-        }
+    if (address <= 0x3FFF) {
+        return ram.Read(address);
+    // } else if (address >= 0x2000 && address <= 0x3FFF) {
+        // I/O Registers
+        // return ioRegisters[address % 8]; // Example: NES-like mirroring
+    } else if (address >= 0x8000) {
+        // ROM
+        return rom.Read(address);
+    } else if (address == 0x5000) {
+        // External register for ben eater's 6502 computer
+        return CHAR_IO.Read();
+    } else if (address == 0x5001) {// 20481
+        // External register for ben eater's 6502 computer
+        if (DEBUG) {
+        printf("some read is happening on address %d\n", address);};
+        return 0xFF; // this indicates that there is a character to read
+    } else if (address == 0x5002) {// 20482
+        // External register for ben eater's 6502 computer
+        if (DEBUG){
+        printf("some read is happening on address %d\n", address);};
+        return 0;
+    } else if (address == 0x5003) {// 20483
+        // External register for ben eater's 6502 computer
+        if (DEBUG){
+        printf("some read is happening on address %d\n", address);}
+        return 0;
+
+
+
+    // fix the input and output stream. a separate bash program is responsible for making the pipes and managing
+    } else if (address == 0x6008) {
+        printf("Reading a char 6008 \n");
+        // Since we are taking a char form the instream, the current char is no longer valid
+        Byte c;
+        c = INSTREAM.Read(); // This just gives the value that is in the register
+        INSTATUS.Write(INSTATUS.Read() & 0b11110111); // set the bit to 0:: indicate no new char available
+        return c;
+} else if (address == 0x6009) {
+    Byte c;
+    ssize_t n = read(in_fd, &c, 1);  // try to read 1 byte
+    if (DEBUG) {printf("Trying to read byte from in_stream, i got %c \n", c);}
+    if (n == 1) {
+        // Successfully read a byte, store it in INSTREAM and set status bit
+        INSTREAM.Write(c);
+        INSTATUS.Write(INSTATUS.Read() | 0b00001000); // set bit 3: new char available
+        if (DEBUG) printf("Read new char from pipe: %c\n", c);
+    } else if (n == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+        // No data available yet; normal for non-blocking
+        if (DEBUG) printf("No new char available\n");
+        INSTATUS.Write(INSTATUS.Read() & 0xF7); // clear bit 3: no new char available
+
+    } else if (n == 0) {
+        // Pipe closed (EOF)
+        if (DEBUG) printf("Pipe closed\n");
+    } else {
+        // Real error
+        perror("read failed");
     }
+    return INSTATUS.Read();
+    } else if (address == 0x600A) {
+        return OUTSTREAM.Read();
+    } else if (address == 0x600B) {
+        return OUTSTATUS.Read();
+    } else {
+
+        printf("Tried to read from address %d\n", address);
+        throw std::out_of_range("Address not mapped");
+    }
+}
 
 void UnifiedMemory::Write(Word address, Byte value) {
+        printf("Memory is write accessed at address %04X \n", address);
         if (address <= 0x3FFF) {
             // RAM with mirroring
             ram.Write(address, value);
@@ -158,8 +207,22 @@ void UnifiedMemory::Write(Word address, Byte value) {
         } else if (address == 0x5003) { // 20483
             // External register for ben eater's 6502 computer
             if (DEBUG) {
-            printf("some write is happening on address %d\n", address);}
+                printf("some write is happening on address %d\n", address);
+            }
             return;
+        } else if (address == 0x6008) {
+            INSTREAM.Write(value);
+            printf("There is a write to instream??");
+        } else if (address == 0x6009) {
+            INSTATUS.Write(value);
+        } else if (address == 0x600A) {
+            if (out_fd != -1) {
+                write(out_fd, &value, 1); // write the Byte to the pipe
+            }
+            // now that we have written a Byte, we mark the status as newly written
+            OUTSTATUS.Write(OUTSTATUS.Read() & 0xFE);
+        } else if (address == 0x600B) {
+            OUTSTATUS.Write(value);
         } else {
             printf("Tried to write to address %d\n", address);
             throw std::out_of_range("Address not mapped");
