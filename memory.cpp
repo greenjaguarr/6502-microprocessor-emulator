@@ -146,7 +146,7 @@ Byte UnifiedMemory::Read(Word address) {
 
     // fix the input and output stream. a separate bash program is responsible for making the pipes and managing
     } else if (address == 0x6008) {
-        printf("Reading a char 6008 \n");
+        // printf("Reading a char 6008 \n");
         // Since we are taking a char form the instream, the current char is no longer valid
         Byte c;
         c = INSTREAM.Read(); // This just gives the value that is in the register
@@ -168,7 +168,7 @@ Byte UnifiedMemory::Read(Word address) {
 
         } else if (n == 0) {
             // Pipe closed (EOF)
-            printf("Pipe closed\n");
+            // printf("Pipe closed\n");
             INSTATUS.Write(0x20); // EOF. Pack it up
             // printf("Warning: Pipe closed \n");
         } else {
