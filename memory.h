@@ -9,6 +9,10 @@ using u32 = unsigned int;
 using Byte = unsigned char;
 using Word = unsigned short;
 
+int in_fd = -1;
+int out_fd = -1;
+int infile_fd = -1;
+
 class Mem {
 protected:
     std::vector<Byte> memory;
@@ -37,7 +41,7 @@ public:
 };
 
 class ExternalRegister {
-    Byte value;  // Only one address, so store a single byte
+    Byte value;  // It has only one address, so it can only store a single byte
     Word address;
 
 public:
@@ -54,7 +58,12 @@ class UnifiedMemory {
     RAM ram;
     ROM rom;
     ExternalRegister CHAR_IO;
-
+    ExternalRegister INSTREAM;
+    ExternalRegister INSTATUS;
+    ExternalRegister OUTSTREAM;
+    ExternalRegister OUTSTATUS;
+    ExternalRegister FILEIN; // take a file as input
+    ExternalRegister STDOUT; // write only output
 public:
     UnifiedMemory();
     Byte Read(Word address);

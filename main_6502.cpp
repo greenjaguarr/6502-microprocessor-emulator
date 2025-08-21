@@ -10,7 +10,7 @@
 
 #define memory_source "memory.bin"
 #define output_file "output.bin"
-#define n_cycles 3000
+#define n_cycles 30000
 #define start_address 0x2000
 #define end_address 0x3fff
 
@@ -34,7 +34,7 @@ int main() {
 
     cpu.dump_contents();
     // Store the output in a file from memory region 0x6000-0x6FFF
-    cpu.store_output_file(output_file, start_address, end_address, memory);
+    cpu.store_output_file(output_file, start_address, end_address, memory);      //ENABLE this for serious stuff, disable for testing sometimes
 
     return 0;
 };
