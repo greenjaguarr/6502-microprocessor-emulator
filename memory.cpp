@@ -82,10 +82,10 @@ void ROM::LoadData(const std::vector<Byte>& data) {
     }
 
 ExternalRegister::ExternalRegister(Word addr)
-        {
-            address = addr;
-            value = 0;
-        }
+{
+    address = addr;
+    value = 0;
+}
 Byte ExternalRegister::Read() {
     return value;
 }

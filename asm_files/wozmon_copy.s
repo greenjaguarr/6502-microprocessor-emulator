@@ -13,12 +13,19 @@ MODE  = $2B                            ; $00=XAM, $7F=STOR, $AE=BLOCK XAM
 
 IN    = $0200                          ; Input buffer
 
+; my own variables
+OUT = $0300                            ; Output buffer
+OUTPTR = $2C                           ; Output pointer store location
+
+
 ACIA_DATA   = $5000 ;; these will raise an error
 ACIA_STATUS = $5001
 ACIA_CMD    = $5002
 ACIA_CTRL   = $5003
 
 RESET:
+                LDA     #$00           ; Initialize the output pointer.
+                STA     OUTPTR
                 LDA     #$1F           ; 8-N-1, 19200 baud.
                 STA     ACIA_CTRL
                 LDA     #$0B           ; No parity, no echo, no interrupts.
@@ -183,7 +190,10 @@ PRHEX:
 
 ECHO:
                 PHA                    ; Save A.
-                STA     ACIA_DATA      ; Output character.
+; A contains the character to be output
+; dont do the regular echo. I will store the output in a buffer from $0300-$03FF
+                STA     OUT,OUTPTR    ; Store character in output buffer.
+                ; STA     ACIA_DATA      ; Output character.
 ;                LDA     #$FF           ; Initialize delay loop.
 ;TXDELAY:        DEC                    ; Decrement A.
 ;                BNE     TXDELAY        ; Until A gets to 0.
