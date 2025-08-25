@@ -9,6 +9,9 @@ using u32 = unsigned int;
 using Byte = unsigned char;
 using Word = unsigned short;
 
+extern int in_fd;
+extern int out_fd;
+extern int infile_fd;
 
 class Mem {
 protected:

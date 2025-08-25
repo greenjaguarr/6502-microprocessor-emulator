@@ -4,7 +4,8 @@
 #include <cstdint>
 #include <vector>
 #include <string>
-
+#include <atomic> // This is for the atomic boolean flags for IRQ and NMI
+#include <csignal> // This is for signal handling (SIGUSR1 and SIGUSR2
 #include "memory.h"
 
 
@@ -14,6 +15,9 @@ public:
     void Execute(u32 Cycles, UnifiedMemory& memory);
     void store_output_file(const std::string& filename, uint16_t start, uint16_t end, UnifiedMemory& memory);
     void dump_contents();
+    void IRQ(u32& Cycles, UnifiedMemory &memory);
+    void NMI(u32& Cycles, UnifiedMemory &memory);
+    static void signal_handler(int signum); // to handle SIGUSR1 for IRQ and SIGUSR2 for NMI
 
 private:
     // Byte memory[65536]; // 64KB memory space
@@ -21,7 +25,13 @@ private:
     Byte A = 0, X=0, Y=0; // Registers
     // uint8_t status; // Status register
     bool C=false, Z=false, I=false, D=false, B=false, V=false, N=false; // Flags
+    std::atomic<bool> irq_flag{false}; // Interrupt Request flag
+    std::atomic<bool> nmi_flag{false}; // Non-Maskable Interrupt flag
     Byte SP; // Stack Pointer
+
+    Word RESET_ADDRESS = 0xFFFC; // Address where the reset vector is located
+    Word NMI_ADDRESS = 0xFFFA; // Address where the NMI vector is located
+    Word IRQ_ADDRESS = 0xFFFE; // Address where the IRQ vector is located
 
     Byte FetchByte(u32& cycles, UnifiedMemory& memory);
     Word FetchWord(u32& cycles, UnifiedMemory& memory);
@@ -44,13 +54,13 @@ private:
     void EOR(Byte operand);
     void CPY(Byte operand);
 
-    Byte AM_IM_LOAD(u32 Cycles, UnifiedMemory& memory); // addressing mode: immediate; Load data from the code at the SP
-    Byte AM_ABS_LOAD(u32 Cycles, UnifiedMemory& memory); // addressing mode: absolute; Load data from an address provided in the code
-    Byte AM_ABSY_LOAD(u32 Cycles, UnifiedMemory& memory); // addressing mode: absolute with offset Y. Y is treated as a two's compliment integer, possibly negative
-    Byte AM_ZP_LOAD(u32 Cycles, UnifiedMemory& memory);
+    Byte AM_IM_LOAD(u32& Cycles, UnifiedMemory& memory); // addressing mode: immediate; Load data from the code at the SP
+    Byte AM_ABS_LOAD(u32& Cycles, UnifiedMemory& memory); // addressing mode: absolute; Load data from an address provided in the code
+    Byte AM_ABSY_LOAD(u32& Cycles, UnifiedMemory& memory); // addressing mode: absolute with offset Y. Y is treated as a two's compliment integer, possibly negative
+    Byte AM_ZP_LOAD(u32& Cycles, UnifiedMemory& memory);
 
-    Word AM_ABSY_STORE(u32 Cycles, UnifiedMemory& memory);
-    Word AM_ZP_STORE(u32 Cycles, UnifiedMemory& memory);
+    Word AM_ABSY_STORE(u32& Cycles, UnifiedMemory& memory);
+    Word AM_ZP_STORE(u32& Cycles, UnifiedMemory& memory);
 
     static constexpr Byte INS_LDA_IM = 0xA9;
     static constexpr Byte INS_LDA_ZP = 0xA5;

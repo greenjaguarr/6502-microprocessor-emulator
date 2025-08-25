@@ -5,8 +5,9 @@
 #include <fstream>
 #include <vector>
 #include <unistd.h>
+#include <csignal>
 
-#include "memory.h"
+// #include "memory.h"
 #include "cpu.h"
 
 // http://www.obelisk.me.uk/6502/
@@ -19,9 +20,11 @@ using Word = unsigned short;
 
 #define DEBUG false
 
+static CPU* globalCPU = nullptr;
+
 
 void CPU::Reset(UnifiedMemory &memory) {
-    PC = 0xFFFC;
+    PC = RESET_ADDRESS;
     SP = 0xFF;
 
     // Reset flags and registers
@@ -32,8 +35,50 @@ void CPU::Reset(UnifiedMemory &memory) {
     Byte lowerStartAddress = memory.Read(0xFFFC);
     Byte upperStartAddress = memory.Read(0xFFFD);
     PC = (upperStartAddress << 8) | lowerStartAddress;
+
+    globalCPU = this;
+    signal(SIGUSR1, CPU::signal_handler);
+    signal(SIGUSR2, CPU::signal_handler);
 }
 
+void CPU::signal_handler(int signum) {
+    if (!globalCPU) return;
+    if (signum == SIGUSR1) globalCPU->irq_flag = true;
+    else if (signum == SIGUSR2) globalCPU->nmi_flag = true;
+}
+
+void CPU::IRQ(u32& Cycles, UnifiedMemory &memory) {
+    if (!I) {
+        pushBytetoStack((PC >> 8) & 0xFF, Cycles, memory);
+        pushBytetoStack(PC & 0xFF, Cycles, memory);
+        Byte status = (C<<0)|(Z<<1)|(I<<2)|(D<<3)|(B<<4)|(V<<6)|(N<<7);
+        pushBytetoStack(status, Cycles, memory);
+        I = 1;
+        Byte low = memory.Read(IRQ_ADDRESS); Cycles--;
+        Byte high = memory.Read(IRQ_ADDRESS+1); Cycles--;
+        PC = (high << 8) | low;
+    }
+}
+
+void CPU::NMI(u32& Cycles, UnifiedMemory &memory) {
+    // Push the current PC onto the stack
+    Byte pc_high = (PC >> 8) & 0xFF;
+    Byte pc_low = PC & 0xFF;
+    pushBytetoStack(pc_high, Cycles, memory);
+    pushBytetoStack(pc_low, Cycles, memory);
+
+    // Push the status register onto the stack
+    Byte status = (C << 0) | (Z << 1) | (I << 2) | (D << 3) | (B << 4) | (V << 6) | (N << 7);
+    pushBytetoStack(status, Cycles, memory);
+
+    // Set the Interrupt Disable flag
+    I = 1;
+
+    // Read the NMI vector from memory
+    Byte lowerAddress = memory.Read(NMI_ADDRESS);
+    Byte upperAddress = memory.Read(NMI_ADDRESS + 1);
+    PC = (upperAddress << 8) | lowerAddress;
+}
 
 Word CPU::FetchWord(u32& Cycles, UnifiedMemory& memory)
     {
@@ -145,10 +190,8 @@ void CPU::ADC(Byte operand) // This happens internally and takes NO cycles
         Byte result = (Byte)sum; // Cast the result back to a Byte / uint_8
         Z = ( result == 0 ) ? 1 : 0; // Check for the zero flag
         N = ( result & 0b10000000 ) ? 1 : 0; // Check for the negative flag ( aka the leading bit is set)
-        V = ((A ^ result ) & ( operand & result ) & 0x80 ) ? 1 : 0; 
-        /* Set oVerflow flag (check for signed overflow)
-        Overflow happens when the sign of A and the operand are the same, but the sign of the result is different
-        idk how it works with adding including the Carry bit*/
+        V = (~(A ^ operand) & (A ^ result) & 0x80) ? 1 : 0;
+
         A = result; // Store the result in the A register
     }
 
@@ -202,34 +245,28 @@ void CPU::CPY(Byte operant){
 
 // Addressing Mode funcs
 
-Byte CPU::AM_IM_LOAD(u32 Cycles, UnifiedMemory& memory) // addressing mode: immediate
+Byte CPU::AM_IM_LOAD(u32& Cycles, UnifiedMemory& memory) // addressing mode: immediate
     {
         // takes one cycle. adds one to the program counter
         Byte operand = FetchByte(Cycles, memory); // fetch the operand
         return operand;
     }
 
-Byte CPU::AM_ABS_LOAD(u32 Cycles, UnifiedMemory& memory) // you need to provide the address where the operand is
+Byte CPU::AM_ABS_LOAD(u32& Cycles, UnifiedMemory& memory) // you need to provide the address where the operand is
 {
     // advances pc by 2. takes 3 cycles
     Word address = FetchWord(Cycles, memory); // it takes 2 cycles to fetch a Word;
     Byte operand = ReadByte(Cycles, memory, address); // it takes 1 cycle to fetch the Byte
     return operand;
 }
-Byte CPU::AM_ABSY_LOAD(u32 Cycles, UnifiedMemory& memory)
-{
-    // takes 3-4 cycles
-    Word base_address = FetchWord(Cycles, memory); // 2 cycles
-    Word address = base_address + Y; // add value of the Y register to the address
-    Cycles--; // this adding of Y takes 1-2 cycles depending on wether or not the address crosses into another page
-
-    // Byte basepage = base_address >> 8;
-    // Byte resultpage = address >> 8;
-    // if (basepage != resultpage){Cycles--;} // check for the crossing of the page
-
-    return address;
+Byte CPU::AM_ABSY_LOAD(u32& Cycles, UnifiedMemory& memory) {
+    Word base_address = FetchWord(Cycles, memory);
+    Word address = base_address + Y;
+    Byte result = ReadByte(Cycles, memory, address);
+    // Optional: handle page penalty
+    return result;
 }
-Byte CPU::AM_ZP_LOAD(u32 Cycles, UnifiedMemory& memory)
+Byte CPU::AM_ZP_LOAD(u32& Cycles, UnifiedMemory& memory)
 {
     
     Byte lower_address = FetchByte(Cycles, memory); // operand indicates where in the zero page, the value is located // 1 cycle
@@ -238,7 +275,7 @@ Byte CPU::AM_ZP_LOAD(u32 Cycles, UnifiedMemory& memory)
     return operand;
 }
 
-Word CPU::AM_ABSY_STORE(u32 Cycles, UnifiedMemory& memory)
+Word CPU::AM_ABSY_STORE(u32& Cycles, UnifiedMemory& memory)
 {
     // takes 4 cycles
     Word base_address = FetchWord(Cycles, memory); // 2 cycles
@@ -254,7 +291,7 @@ Word CPU::AM_ABSY_STORE(u32 Cycles, UnifiedMemory& memory)
 
     return address;
 }
-Word CPU::AM_ZP_STORE(u32 Cycles, UnifiedMemory& memory)
+Word CPU::AM_ZP_STORE(u32& Cycles, UnifiedMemory& memory)
 {
     // takes 1 cycles
     Byte lower_address = FetchByte(Cycles, memory); // operand indicates where in the zero page, the value is located
@@ -273,6 +310,21 @@ void CPU::Execute(u32 Cycles, UnifiedMemory& memory) // Cycles: for how many clo
             if (DEBUG){
                 std::cout << "[DEBUG]" << Cycles << " Cycles remaining" << std::endl;
             }
+
+            // Check for interrupts
+            if (nmi_flag) {
+                if (DEBUG) {std::cout << "[DEBUG] NMI triggered" << std::endl;}
+                NMI(Cycles, memory);
+                nmi_flag = false; // Reset the flag
+            } else if (irq_flag) {
+                if (DEBUG) {std::cout << "[DEBUG] IRQ triggered" << std::endl;}
+                IRQ(Cycles, memory);
+                irq_flag = false; // Reset the flag
+            }
+
+
+
+
             // step 1: fetch next instruction from memory
             Byte Instruction = FetchByte(Cycles, memory);
 

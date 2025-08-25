@@ -5,7 +5,7 @@
 #include <fstream>
 #include <vector>
 
-#include "memory.h"
+// #include "memory.h"
 #include "cpu.h"
 
 #define memory_source "memory.bin"
@@ -24,6 +24,9 @@ int main() {
         std::cerr << "Failed to load ROM data. Exiting." << std::endl;
         return 1;
     }
+    std::cout << "PID: " << getpid() << "\n";
+
+
 
     // Initialize the CPU and reset it
     CPU cpu;
